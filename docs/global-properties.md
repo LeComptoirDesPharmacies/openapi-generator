@@ -44,21 +44,22 @@ emits one method whose request type is a union discriminated by `contentType` an
 selected by overloads on `accept`.
 
 ```ts
-export type CreateReportRequest =
-    | { contentType?: 'application/json'; report?: Report; reportXml?: never; }
-    | { contentType: 'application/xml'; reportXml?: ReportXml; report?: never; }
-;
+export type CreateReportRequest = runtime.ExclusiveUnion<
+    | { contentType?: 'application/json'; report?: Report; }
+    | { contentType: 'application/xml'; reportXml?: ReportXml; }
+>;
 
 async createReport(requestParameters: CreateReportRequest & { accept?: 'application/json' }, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Receipt>;
 async createReport(requestParameters: CreateReportRequest & { accept: 'application/pdf' }, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob>;
 ```
 
-Each member declares the other members' bodies as `never`. Without it nothing stops a caller from handing an
-XML body to the JSON member and having it silently sent as JSON: excess property checking, which would
-normally reject the surplus property, treats a key present in *any* member of a union as known, so it never
-fires here — for an object literal no more than for a variable. What rejects most shapes is unrelated: weak
-type detection when every property of a member is optional, a missing required property otherwise. A member
-with a required parameter and an optional body has neither.
+`ExclusiveUnion` makes the members mutually exclusive, by declaring on each of them the keys it does not
+have as `never`. Without it nothing stops a caller from handing an XML body to the JSON member and having it
+silently sent as JSON: excess property checking, which would normally reject the surplus property, treats a
+key present in *any* member of a union as known, so it never fires here — for an object literal no more than
+for a variable. What rejects most shapes is unrelated: weak type detection when every property of a member
+is optional, a missing required property otherwise. A member with a required parameter and an optional body
+has neither. The helper is emitted into `runtime.ts` only when this option is on.
 
 Two cases are left split rather than merged, with a warning. An operation accepting several request
 content-types one of which is a form or multipart body, because such a body is spread over individual

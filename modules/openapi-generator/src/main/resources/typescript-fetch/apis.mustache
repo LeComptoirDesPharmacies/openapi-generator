@@ -25,11 +25,13 @@ import {
 {{#vendorExtensions.x-content-type-merged}}
 {{! the operation accepts several request content-types with different schemas: one union member per
     content-type, discriminated by `contentType`, whose value selects the body's type }}
-export type {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request =
+{{! runtime.ExclusiveUnion makes the members mutually exclusive: without it a value carrying another
+    member's body satisfies this one, and the body goes out under the wrong content-type }}
+export type {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request = {{#vendorExtensions.x-content-type-has-request-variants}}runtime.ExclusiveUnion<{{/vendorExtensions.x-content-type-has-request-variants}}
 {{#vendorExtensions.x-content-type-request-variants}}
-    | { {{#vendorExtensions.x-content-type-has-request-variants}}contentType{{#isDefault}}?{{/isDefault}}: '{{mediaType}}'; {{/vendorExtensions.x-content-type-has-request-variants}}{{#allParams}}{{paramName}}{{^required}}?{{/required}}: {{#isEnum}}{{{datatypeWithEnum}}}{{/isEnum}}{{^isEnum}}{{#hasReadOnly}}Omit<{{{dataType}}}, {{#readOnlyVars}}'{{baseName}}'{{^-last}}|{{/-last}}{{/readOnlyVars}}>{{/hasReadOnly}}{{^hasReadOnly}}{{{dataType}}}{{/hasReadOnly}}{{#isNullable}} | null{{/isNullable}}{{/isEnum}}; {{/allParams}}{{#excludedParams}}{{.}}?: never; {{/excludedParams}}}
+    | { {{#vendorExtensions.x-content-type-has-request-variants}}contentType{{#isDefault}}?{{/isDefault}}: '{{mediaType}}'; {{/vendorExtensions.x-content-type-has-request-variants}}{{#allParams}}{{paramName}}{{^required}}?{{/required}}: {{#isEnum}}{{{datatypeWithEnum}}}{{/isEnum}}{{^isEnum}}{{#hasReadOnly}}Omit<{{{dataType}}}, {{#readOnlyVars}}'{{baseName}}'{{^-last}}|{{/-last}}{{/readOnlyVars}}>{{/hasReadOnly}}{{^hasReadOnly}}{{{dataType}}}{{/hasReadOnly}}{{#isNullable}} | null{{/isNullable}}{{/isEnum}}; {{/allParams}}}
 {{/vendorExtensions.x-content-type-request-variants}}
-;
+{{#vendorExtensions.x-content-type-has-request-variants}}>{{/vendorExtensions.x-content-type-has-request-variants}};
 
 {{/vendorExtensions.x-content-type-merged}}
 {{^vendorExtensions.x-content-type-merged}}

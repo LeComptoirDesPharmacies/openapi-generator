@@ -263,6 +263,9 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
     @Override
     public void processOpts() {
         super.processOpts();
+        // runtime.ts only carries the ExclusiveUnion helper when the option that needs it is on, so an
+        // ordinary client is byte-for-byte what it was
+        additionalProperties.put(CodegenConstants.SPLIT_OPERATIONS_BY_CONTENT_TYPE, splitOperationsByContentType);
         additionalProperties.put("isOriginalModelPropertyNaming", getModelPropertyNaming() == CodegenConstants.MODEL_PROPERTY_NAMING_TYPE.original);
         additionalProperties.put("modelPropertyNaming", getModelPropertyNaming().name());
 
@@ -1059,39 +1062,14 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
      * expects as the generator resolved it. A single-element list means the request axis was not split.
      */
     private List<Map<String, Object>> requestVariantsOf(List<CodegenOperation> variants) {
-        List<Map<String, Object>> entries = variantsByMediaType(variants,
+        // the members are made mutually exclusive by runtime.ExclusiveUnion rather than by listing each
+        // other member's body as `never` here, which grows quadratically with the number of content-types
+        return variantsByMediaType(variants,
                 CodegenConstants.X_CONTENT_TYPE_VARIANT_REQUEST,
                 CodegenConstants.X_CONTENT_TYPE_VARIANT_REQUEST_INDEX, (entry, variant) -> {
                     entry.put("allParams", variant.allParams);
                     entry.put("bodyParam", variant.bodyParam);
                 });
-        excludeOtherVariantsBodies(entries);
-        return entries;
-    }
-
-    /**
-     * Records, for each member of the request union, the body properties that belong to the <em>other</em>
-     * members, so the template can declare them {@code never} there.
-     * <p>
-     * Without it a caller can hand an XML body to the JSON member and have it silently sent as JSON. Excess
-     * property checking, which would normally reject the surplus property, is no help: against a union it
-     * treats a key present in <em>any</em> member as known, so it never fires — for an object literal no
-     * more than for a variable. What rejects most shapes is unrelated: weak type detection when every
-     * property of a member is optional, a missing required property otherwise. A member with a required
-     * parameter and an optional body has neither.
-     */
-    private void excludeOtherVariantsBodies(List<Map<String, Object>> entries) {
-        Set<String> everyBodyName = entries.stream()
-                .map(entry -> (CodegenParameter) entry.get("bodyParam"))
-                .filter(Objects::nonNull)
-                .map(param -> param.paramName)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-        for (Map<String, Object> entry : entries) {
-            CodegenParameter own = (CodegenParameter) entry.get("bodyParam");
-            entry.put("excludedParams", everyBodyName.stream()
-                    .filter(name -> own == null || !name.equals(own.paramName))
-                    .collect(Collectors.toList()));
-        }
     }
 
     /**
