@@ -74,12 +74,6 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
 
     // Rendering data attached to an operation merged back from its content-type variants, consumed by
     // apisContentTypeVariants.mustache. See mergeContentTypeVariants.
-    private static final String X_CT_MERGED = "x-content-type-merged";
-    private static final String X_CT_REQUEST_VARIANTS = "x-content-type-request-variants";
-    private static final String X_CT_RESPONSE_VARIANTS = "x-content-type-response-variants";
-    private static final String X_CT_RESPONSE_DISPATCH = "x-content-type-response-dispatch";
-    private static final String X_CT_HAS_REQUEST_VARIANTS = "x-content-type-has-request-variants";
-    private static final String X_CT_HAS_RESPONSE_VARIANTS = "x-content-type-has-response-variants";
 
     @Getter @Setter
     protected String npmRepository = null;
@@ -1029,18 +1023,19 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
             // before the rename, so each variant still carries the name its enum types were built from
             reprefixEnumParameters(variants, toOperationIdCamelCase(base));
             renameToGroupOperationId(base);
-            base.vendorExtensions.put(X_CT_MERGED, true);
-            base.vendorExtensions.put(X_CT_REQUEST_VARIANTS, requestVariants);
-            base.vendorExtensions.put(X_CT_RESPONSE_VARIANTS, responseVariants);
-            base.vendorExtensions.put(X_CT_HAS_REQUEST_VARIANTS, requestVariants.size() > 1);
-            base.vendorExtensions.put(X_CT_HAS_RESPONSE_VARIANTS, responseVariants.size() > 1);
+            ExtendedCodegenOperation merged = (ExtendedCodegenOperation) base;
+            merged.contentTypeMerged = true;
+            merged.contentTypeRequestVariants = requestVariants;
+            merged.contentTypeResponseVariants = responseVariants;
+            merged.hasContentTypeRequestVariants = requestVariants.size() > 1;
+            merged.hasContentTypeResponseVariants = responseVariants.size() > 1;
             if (responseVariants.size() > 1) {
                 // the same variants, but ordered for an if / else if / else chain: the default content-type
                 // is the fallback, so it comes last there rather than first. Only meaningful beyond one
                 // variant - a single one would be both the chain's first and last branch.
                 List<Map<String, Object>> dispatch = new ArrayList<>(responseVariants.subList(1, responseVariants.size()));
                 dispatch.add(responseVariants.get(0));
-                base.vendorExtensions.put(X_CT_RESPONSE_DISPATCH, dispatch);
+                merged.contentTypeResponseDispatch = dispatch;
             }
 
             variants.stream().filter(op -> op != base).forEach(superseded::add);
@@ -1661,6 +1656,17 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
     public class ExtendedCodegenOperation extends CodegenOperation {
         boolean hasReturnPassthroughVoid, returnTypeSupportsEntities, returnTypeIsModel, returnTypeIsArray;
         String returnTypeAlternate, returnBaseTypeAlternate, returnPassthrough;
+
+        /**
+         * Set by {@link TypeScriptFetchClientCodegen#mergeContentTypeVariants} on an operation merged back
+         * from its content-type variants. Fields rather than vendor extensions: a mistyped `x-` key renders
+         * as nothing at all in a template, and {@link CodegenOperation#hashCode()} walks the extensions map,
+         * which these lists have no business being dragged through.
+         */
+        public boolean contentTypeMerged, hasContentTypeRequestVariants, hasContentTypeResponseVariants;
+        public List<Map<String, Object>> contentTypeRequestVariants, contentTypeResponseVariants;
+        /** The response variants ordered for an if / else if / else chain: the default one comes last. */
+        public List<Map<String, Object>> contentTypeResponseDispatch;
 
         public ExtendedCodegenOperation(CodegenOperation o) {
             super();
