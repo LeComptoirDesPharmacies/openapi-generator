@@ -1009,9 +1009,17 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
             if (variants.size() < 2) {
                 continue;
             }
-            if (variants.stream().anyMatch(CodegenOperation::getHasFormParams)) {
-                once(LOGGER).warn("Operation `{}` has a form or multipart body: its content-type variants are "
-                                + "generated as separate methods rather than merged into one.",
+            List<Map<String, Object>> requestVariants = requestVariantsOf(variants);
+            List<Map<String, Object>> responseVariants = responseVariantsOf(variants);
+
+            // A form or multipart body is spread over individual parameters rather than gathered in a single
+            // body parameter, so request content-types cannot be folded into a discriminated union. This only
+            // rules out splitting the request axis: merging the response axis just adds `accept` to the
+            // request object and leaves the body alone.
+            if (requestVariants.size() > 1 && variants.stream().anyMatch(CodegenOperation::getHasFormParams)) {
+                once(LOGGER).warn("Operation `{}` accepts several request content-types, one of which is a form "
+                                + "or multipart body: its content-type variants are generated as separate "
+                                + "methods rather than merged into one.",
                         variants.get(0).vendorExtensions.get(CodegenConstants.X_CONTENT_TYPE_VARIANT_GROUP));
                 continue;
             }
@@ -1022,9 +1030,6 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
                             && Integer.valueOf(0).equals(op.vendorExtensions.get(CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE_INDEX)))
                     .findFirst()
                     .orElse(variants.get(0));
-
-            List<Map<String, Object>> requestVariants = requestVariantsOf(variants);
-            List<Map<String, Object>> responseVariants = responseVariantsOf(variants);
 
             renameToGroupOperationId(base);
             base.vendorExtensions.put(X_CT_MERGED, true);

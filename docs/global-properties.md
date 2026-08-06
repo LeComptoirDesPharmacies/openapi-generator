@@ -53,9 +53,15 @@ async createReport(requestParameters: CreateReportRequest & { accept?: 'applicat
 async createReport(requestParameters: CreateReportRequest & { accept: 'application/pdf' }, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob>;
 ```
 
-Two operations are left split rather than merged, with a warning: those with a form or multipart body, whose
-parameters are spread over the request object rather than gathered in a single body, and all of them when
-`useSingleRequestParameter` is off, since there is then no request object to carry the discriminant.
+Two cases are left split rather than merged, with a warning. An operation accepting several request
+content-types one of which is a form or multipart body, because such a body is spread over individual
+parameters rather than gathered in one, and so cannot be folded into a discriminated union — merging the
+response axis of an operation with a form body is unaffected, since it only adds `accept` to the request
+object. And every operation when `useSingleRequestParameter` is off, since the parameters are then spread
+over the signature and there is no request object to carry the discriminant.
+
+In both cases the separate, individually typed methods the split produced are generated as they are, which
+is what a statically-typed generator emits anyway.
 
 
 ## Note on Global Property declaration

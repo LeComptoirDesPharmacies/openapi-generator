@@ -108,6 +108,37 @@ public class TypeScriptFetchClientCodegenTest {
     }
 
     @Test
+    public void testMergesTheResponseAxisEvenWithAFormBody() throws IOException {
+        File output = Files.createTempDirectory("test").toFile();
+        output.deleteOnExit();
+
+        final CodegenConfigurator configurator = new CodegenConfigurator()
+                .setGeneratorName("typescript-fetch")
+                .setInputSpec("src/test/resources/3_0/issue6708-split-by-content-type-form.yaml")
+                .addGlobalProperty(CodegenConstants.SPLIT_OPERATIONS_BY_CONTENT_TYPE, "true")
+                .setOutputDir(output.getAbsolutePath().replace("\\", "/"));
+
+        Generator generator = new DefaultGenerator();
+        generator.opts(configurator.toClientOptInput()).generate().forEach(File::deleteOnExit);
+
+        Path api = Paths.get(output + "/apis/FilesApi.ts");
+
+        // POST /upload has a single, multipart request content-type and two response content-types. Only the
+        // response axis is split, and merging it just adds `accept` to the request object, so the form body
+        // is no reason to leave the variants apart.
+        TestUtils.assertFileNotContains(api, "uploadAsJson", "uploadAsPdf");
+        TestUtils.assertFileContains(api,
+                "async upload(requestParameters: UploadRequest & { accept?: 'application/json' }",
+                "async upload(requestParameters: UploadRequest & { accept: 'application/pdf' }",
+                "body: formParams,");
+
+        // POST /convert accepts both application/json and multipart/form-data. A form body is spread over
+        // individual parameters rather than gathered in one body parameter, so the request axis cannot be
+        // folded into a discriminated union: those variants stay separate methods.
+        TestUtils.assertFileContains(api, "async convertWithJson(", "async convertWithFormData(");
+    }
+
+    @Test
     public void testLeavesOperationsUntouchedWithoutTheGlobalOption() throws IOException {
         File output = Files.createTempDirectory("test").toFile();
         output.deleteOnExit();
