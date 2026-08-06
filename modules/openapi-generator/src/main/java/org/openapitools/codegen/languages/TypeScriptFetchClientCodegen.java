@@ -1010,19 +1010,16 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
             if (variants.size() < 2) {
                 continue;
             }
-            List<Map<String, Object>> requestVariants = requestVariantsOf(variants);
-            List<Map<String, Object>> responseVariants = responseVariantsOf(variants);
+            List<ContentTypeVariant> requestVariants = requestVariantsOf(variants);
+            List<ContentTypeVariant> responseVariants = responseVariantsOf(variants);
 
             // the surviving operation is the one a caller gets without asking: rank 0 on both axes
             CodegenOperation base = variants.stream()
-                    .filter(op -> Integer.valueOf(0).equals(op.vendorExtensions.get(CodegenConstants.X_CONTENT_TYPE_VARIANT_REQUEST_INDEX))
-                            && Integer.valueOf(0).equals(op.vendorExtensions.get(CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE_INDEX)))
+                    .filter(TypeScriptFetchClientCodegen::isDefaultVariant)
                     .findFirst()
                     .orElse(variants.get(0));
 
-            // before the rename, so each variant still carries the name its enum types were built from
-            reprefixEnumParameters(variants, toOperationIdCamelCase(base));
-            renameToGroupOperationId(base);
+            renameToGroupOperationId(base, variants);
             ExtendedCodegenOperation merged = (ExtendedCodegenOperation) base;
             merged.contentTypeMerged = true;
             merged.contentTypeRequestVariants = requestVariants;
@@ -1033,8 +1030,8 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
                 // the same variants, but ordered for an if / else if / else chain: the default content-type
                 // is the fallback, so it comes last there rather than first. Only meaningful beyond one
                 // variant - a single one would be both the chain's first and last branch.
-                List<Map<String, Object>> dispatch = new ArrayList<>(responseVariants.subList(1, responseVariants.size()));
-                dispatch.add(responseVariants.get(0));
+                List<ContentTypeVariant> dispatch = new ArrayList<>(responseVariants);
+                Collections.rotate(dispatch, -1);
                 merged.contentTypeResponseDispatch = dispatch;
             }
 
@@ -1049,19 +1046,16 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
      * One entry per distinct request content-type, in declaration order, carrying the body that content-type
      * expects as the generator resolved it. A single-element list means the request axis was not split.
      */
-    private List<Map<String, Object>> requestVariantsOf(List<CodegenOperation> variants) {
-        // the members are made mutually exclusive by runtime.ExclusiveUnion rather than by listing each
-        // other member's body as `never` here, which grows quadratically with the number of content-types
-        return variantsByMediaType(variants,
-                CodegenConstants.X_CONTENT_TYPE_VARIANT_REQUEST,
+    private List<ContentTypeVariant> requestVariantsOf(List<CodegenOperation> variants) {
+        return variantsByRank(variants, CodegenConstants.X_CONTENT_TYPE_VARIANT_REQUEST,
                 CodegenConstants.X_CONTENT_TYPE_VARIANT_REQUEST_INDEX, (entry, variant) -> {
-                    entry.put("allParams", variant.allParams);
-                    entry.put("bodyParam", variant.bodyParam);
+                    entry.allParams = variant.allParams;
+                    entry.bodyParam = variant.bodyParam;
                     // a form or multipart variant carries its body in individual parameters rather than in a
                     // body parameter: the template assembles it per content-type, from these
-                    entry.put("hasFormParams", variant.getHasFormParams());
-                    entry.put("formParams", variant.formParams);
-                    entry.put("consumes", variant.consumes);
+                    entry.hasFormParams = variant.getHasFormParams();
+                    entry.formParams = variant.formParams;
+                    entry.consumes = variant.consumes;
                 });
     }
 
@@ -1070,49 +1064,38 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
      * generator resolved for it and the flags {@code apisResponseVariantValue.mustache} needs to pick a
      * deserialiser. A single-element list means the response axis was not split.
      */
-    private List<Map<String, Object>> responseVariantsOf(List<CodegenOperation> variants) {
-        return variantsByMediaType(variants, CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE,
+    private List<ContentTypeVariant> responseVariantsOf(List<CodegenOperation> variants) {
+        return variantsByRank(variants, CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE,
                 CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE_INDEX, (entry, variant) -> {
-            // absent rather than null: a null value would let Mustache fall back to the enclosing operation
-            entry.put("hasReturnType", variant.returnType != null);
-            if (variant.returnType != null) {
-                entry.put("returnType", variant.returnType);
-            }
-            if (variant.returnBaseType != null) {
-                entry.put("returnBaseType", variant.returnBaseType);
-            }
-            entry.put("isResponseFile", variant.isResponseFile);
-            entry.put("returnTypeIsPrimitive", variant.returnTypeIsPrimitive);
-            entry.put("returnSimpleType", variant.returnSimpleType);
-            entry.put("isArray", variant.isArray);
-            entry.put("isMap", variant.isMap);
-            entry.put("uniqueItems", variant.uniqueItems);
-        });
+                    entry.hasReturnType = variant.returnType != null;
+                    entry.returnType = variant.returnType;
+                    entry.returnBaseType = variant.returnBaseType;
+                    entry.isResponseFile = variant.isResponseFile;
+                    entry.returnTypeIsPrimitive = variant.returnTypeIsPrimitive;
+                    entry.returnSimpleType = variant.returnSimpleType;
+                    entry.isArray = variant.isArray;
+                    entry.isMap = variant.isMap;
+                    entry.uniqueItems = variant.uniqueItems;
+                });
     }
 
     /**
-     * Groups the variants by their media-type on one axis, one entry per media-type, ordered by the rank the
-     * split recorded — the order the spec declares the content-types in. The rank is read from the variants
-     * rather than from their position in the list, which is not the split's: operations are reordered on
-     * their way to the generator.
-     * <p>
-     * Entries are plain maps rather than the variant operations: a template iterating them then still sees
-     * the <em>merged</em> operation's {@code nickname} and {@code operationIdCamelCase} through Mustache's
-     * parent-context fallback, and, more importantly, an operation must never hold itself in its own
-     * {@code vendorExtensions} — {@link CodegenOperation#hashCode()} walks that map.
+     * Groups the variants by their rank on one axis, one entry per media-type, ordered by the rank the split
+     * recorded — the order the spec declares the content-types in. The rank is read from the variants rather
+     * than from their position in the list, which is not the split's: operations are reordered on their way
+     * to the generator.
      */
-    private List<Map<String, Object>> variantsByMediaType(List<CodegenOperation> variants, String axisExtension,
-                                                          String indexExtension,
-                                                          BiConsumer<Map<String, Object>, CodegenOperation> describe) {
-        Map<Integer, Map<String, Object>> byRank = new TreeMap<>();
+    private List<ContentTypeVariant> variantsByRank(List<CodegenOperation> variants, String axisExtension,
+                                                    String indexExtension,
+                                                    BiConsumer<ContentTypeVariant, CodegenOperation> describe) {
+        Map<Integer, ContentTypeVariant> byRank = new TreeMap<>();
         for (CodegenOperation variant : variants) {
-            // an axis left unsplit has no media-type: every variant then represents the same, single one
-            Object mediaType = variant.vendorExtensions.get(axisExtension);
             Integer rank = (Integer) variant.vendorExtensions.get(indexExtension);
             byRank.computeIfAbsent(rank, key -> {
-                Map<String, Object> entry = new HashMap<>();
-                entry.put("mediaType", mediaType);
-                entry.put("isDefault", key == 0);
+                ContentTypeVariant entry = new ContentTypeVariant();
+                // an axis left unsplit has no media-type: every variant then represents the same, single one
+                entry.mediaType = (String) variant.vendorExtensions.get(axisExtension);
+                entry.isDefault = key == 0;
                 describe.accept(entry, variant);
                 return entry;
             });
@@ -1120,9 +1103,24 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
         return new ArrayList<>(byRank.values());
     }
 
-    /** The camel-case name the merged operation will take, i.e. the one it was split from. */
-    private String toOperationIdCamelCase(CodegenOperation variant) {
-        return camelize(toOperationId((String) variant.vendorExtensions.get(CodegenConstants.X_CONTENT_TYPE_VARIANT_GROUP)));
+    /**
+     * One content-type of a merged operation, on one axis. Read by the templates through their own field
+     * names, so a mistyped one fails to compile rather than rendering as nothing.
+     */
+    public static class ContentTypeVariant {
+        public String mediaType;
+        public boolean isDefault;
+
+        // request axis
+        public List<CodegenParameter> allParams, formParams;
+        public CodegenParameter bodyParam;
+        public boolean hasFormParams;
+        public List<Map<String, String>> consumes;
+
+        // response axis
+        public boolean hasReturnType, isResponseFile, returnTypeIsPrimitive, returnSimpleType, isArray, isMap,
+                uniqueItems;
+        public String returnType, returnBaseType;
     }
 
     /**
@@ -1145,10 +1143,24 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
         }
     }
 
-    /** Gives a merged operation back the name of the operation it was split from. */
-    private void renameToGroupOperationId(CodegenOperation operation) {
+    /** The variant a caller gets without asking: rank 0 on both axes. */
+    private static boolean isDefaultVariant(CodegenOperation op) {
+        return Integer.valueOf(0).equals(op.vendorExtensions.get(CodegenConstants.X_CONTENT_TYPE_VARIANT_REQUEST_INDEX))
+                && Integer.valueOf(0).equals(op.vendorExtensions.get(CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE_INDEX));
+    }
+
+    /**
+     * Gives a merged operation back the name of the operation it was split from, and moves the variants' enum
+     * types onto that name.
+     * <p>
+     * The two belong together: reprefixEnumParameters reads each variant's current name, so it has to run
+     * before this one is renamed. Splitting them across two calls made that ordering invisible, and easy to
+     * get backwards.
+     */
+    private void renameToGroupOperationId(CodegenOperation operation, List<CodegenOperation> variants) {
         String group = (String) operation.vendorExtensions.get(CodegenConstants.X_CONTENT_TYPE_VARIANT_GROUP);
         String operationId = toOperationId(group);
+        reprefixEnumParameters(variants, camelize(operationId));
         operation.operationIdOriginal = group;
         operation.operationId = operationId;
         operation.nickname = operationId;
@@ -1664,9 +1676,9 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
          * which these lists have no business being dragged through.
          */
         public boolean contentTypeMerged, hasContentTypeRequestVariants, hasContentTypeResponseVariants;
-        public List<Map<String, Object>> contentTypeRequestVariants, contentTypeResponseVariants;
+        public List<ContentTypeVariant> contentTypeRequestVariants, contentTypeResponseVariants;
         /** The response variants ordered for an if / else if / else chain: the default one comes last. */
-        public List<Map<String, Object>> contentTypeResponseDispatch;
+        public List<ContentTypeVariant> contentTypeResponseDispatch;
 
         public ExtendedCodegenOperation(CodegenOperation o) {
             super();
