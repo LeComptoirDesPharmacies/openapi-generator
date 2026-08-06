@@ -151,6 +151,29 @@ public class TypeScriptFetchClientCodegenTest {
     }
 
     @Test
+    public void testEnumParameterFollowsTheMergedOperationName() throws IOException {
+        File output = Files.createTempDirectory("test").toFile();
+        output.deleteOnExit();
+
+        final CodegenConfigurator configurator = new CodegenConfigurator()
+                .setGeneratorName("typescript-fetch")
+                .setInputSpec("src/test/resources/3_0/issue6708-split-by-content-type-enum-param.yaml")
+                .addGlobalProperty(CodegenConstants.SPLIT_OPERATIONS_BY_CONTENT_TYPE, "true")
+                .setOutputDir(output.getAbsolutePath().replace("\\", "/"));
+
+        Generator generator = new DefaultGenerator();
+        generator.opts(configurator.toClientOptInput()).generate().forEach(File::deleteOnExit);
+
+        // An enum parameter's type is named after its operation, and the enum is declared once. The merge
+        // renames the operation, so both sides have to end up on the merged name - the request union
+        // references every variant's parameters, not just the surviving one's.
+        Path api = Paths.get(output + "/apis/OrderApi.ts");
+        TestUtils.assertFileContains(api,
+                "| { orderBy?: GetOrdersOrderByEnum; }",
+                "export const GetOrdersOrderByEnum = {");
+    }
+
+    @Test
     public void testMergesFormAndMultipartVariants() throws IOException {
         File output = Files.createTempDirectory("test").toFile();
         output.deleteOnExit();

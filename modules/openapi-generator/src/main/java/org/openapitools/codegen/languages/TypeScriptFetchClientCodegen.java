@@ -757,8 +757,6 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
             supportingFiles.add(new SupportingFile("models.index.mustache", modelPackage().replace('.', File.separatorChar), "index.ts"));
         }
 
-        // before everything else, so the remaining passes see the merged operations under their final names
-        this.mergeContentTypeVariants(operations);
         this.addOperationModelImportInformation(operations);
         this.escapeOperationIds(operations);
         this.updateOperationParameterForEnum(operations);
@@ -767,6 +765,11 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
         }
         this.addOperationObjectResponseInformation(operations);
         this.addOperationPrefixParameterInterfacesInformation(operations);
+        // last: the merge drops the non-default variants from the list while the merged operation keeps
+        // referencing their parameters and return types. Every pass above has to have seen them by then -
+        // updateOperationParameterForEnum, for one, is what prefixes an enum parameter's type name with the
+        // operation's, and a variant it never visited would be left referencing a type nobody declares.
+        this.mergeContentTypeVariants(operations);
 
         return operations;
     }
@@ -1020,6 +1023,8 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
                     .findFirst()
                     .orElse(variants.get(0));
 
+            // before the rename, so each variant still carries the name its enum types were built from
+            reprefixEnumParameters(variants, toOperationIdCamelCase(base));
             renameToGroupOperationId(base);
             base.vendorExtensions.put(X_CT_MERGED, true);
             base.vendorExtensions.put(X_CT_REQUEST_VARIANTS, requestVariants);
@@ -1116,6 +1121,31 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
             });
         }
         return new ArrayList<>(byRank.values());
+    }
+
+    /** The camel-case name the merged operation will take, i.e. the one it was split from. */
+    private String toOperationIdCamelCase(CodegenOperation variant) {
+        return camelize(toOperationId((String) variant.vendorExtensions.get(CodegenConstants.X_CONTENT_TYPE_VARIANT_GROUP)));
+    }
+
+    /**
+     * Renames the enum types of every variant's parameters after the merged operation rather than after the
+     * variant they came from.
+     * <p>
+     * {@code updateOperationParameterForEnum} prefixes an enum parameter's type with its operation's name, so
+     * that two operations sharing a parameter name do not declare the same type twice. It ran before the
+     * merge, when each variant still had its own name — but the enum is declared once, under the merged
+     * operation's name, and the request union references every variant's parameters.
+     */
+    private void reprefixEnumParameters(List<CodegenOperation> variants, String mergedIdCamelCase) {
+        for (CodegenOperation variant : variants) {
+            for (CodegenParameter param : variant.allParams) {
+                if (Boolean.TRUE.equals(param.isEnum) && param.datatypeWithEnum != null) {
+                    param.datatypeWithEnum = param.datatypeWithEnum.replace(
+                            variant.operationIdCamelCase + param.enumName, mergedIdCamelCase + param.enumName);
+                }
+            }
+        }
     }
 
     /** Gives a merged operation back the name of the operation it was split from. */
