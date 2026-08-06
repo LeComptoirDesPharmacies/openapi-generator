@@ -1113,12 +1113,15 @@ public class DefaultCodegen implements CodegenConfig {
         // rest of the generator: addConsumesInfo keeps that order and templates read consumes.0.
         String baseId = getOrGenerateOperationId(operation, path, httpMethod);
         List<Operation> variants = new ArrayList<>(requestAxis.size() * responseAxis.size());
-        for (int requestIndex = 0; requestIndex < requestAxis.size(); requestIndex++) {
-            for (int responseIndex = 0; responseIndex < responseAxis.size(); responseIndex++) {
-                Operation variant = buildOperationVariant(openAPI, operation, baseId, requestAxis.get(requestIndex),
-                        responseAxis.get(responseIndex), methodResponseCode, methodResponse);
-                tagContentTypeVariant(variant, baseId, requestAxis.get(requestIndex), requestIndex,
-                        responseAxis.get(responseIndex), responseIndex);
+        for (String requestMediaType : requestAxis) {
+            for (String responseMediaType : responseAxis) {
+                Operation variant = buildOperationVariant(openAPI, operation, baseId, requestMediaType,
+                        responseMediaType, methodResponseCode, methodResponse);
+                // the rank travels with the variant: the operations are reordered before they reach a
+                // generator, so their position in the list is no longer the order declared in the spec
+                tagContentTypeVariant(variant, baseId,
+                        requestMediaType, requestAxis.indexOf(requestMediaType),
+                        responseMediaType, responseAxis.indexOf(responseMediaType));
                 variants.add(variant);
             }
         }
