@@ -285,7 +285,6 @@ export class PetApi extends runtime.BaseAPI implements PetApiInterface {
                 'Required parameter "body" was null or undefined when calling addPet().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -336,7 +335,6 @@ export class PetApi extends runtime.BaseAPI implements PetApiInterface {
                 'Required parameter "petId" was null or undefined when calling deletePet().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -389,7 +387,6 @@ export class PetApi extends runtime.BaseAPI implements PetApiInterface {
                 'Required parameter "status" was null or undefined when calling findPetsByStatus().'
             );
         }
-
         const queryParameters: any = {};
 
         if (requestParameters['status'] != null) {
@@ -445,7 +442,6 @@ export class PetApi extends runtime.BaseAPI implements PetApiInterface {
                 'Required parameter "tags" was null or undefined when calling findPetsByTags().'
             );
         }
-
         const queryParameters: any = {};
 
         if (requestParameters['tags'] != null) {
@@ -502,7 +498,6 @@ export class PetApi extends runtime.BaseAPI implements PetApiInterface {
                 'Required parameter "petId" was null or undefined when calling getPetById().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -553,7 +548,6 @@ export class PetApi extends runtime.BaseAPI implements PetApiInterface {
                 'Required parameter "body" was null or undefined when calling updatePet().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -604,7 +598,6 @@ export class PetApi extends runtime.BaseAPI implements PetApiInterface {
                 'Required parameter "petId" was null or undefined when calling updatePetWithForm().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -635,6 +628,7 @@ export class PetApi extends runtime.BaseAPI implements PetApiInterface {
         if (requestParameters['status'] != null) {
             formParams.append('status', requestParameters['status'] as any);
         }
+
 
 
         let urlPath = `/pet/{petId}`;
@@ -676,7 +670,6 @@ export class PetApi extends runtime.BaseAPI implements PetApiInterface {
                 'Required parameter "petId" was null or undefined when calling uploadFile().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -709,6 +702,7 @@ export class PetApi extends runtime.BaseAPI implements PetApiInterface {
         if (requestParameters['file'] != null) {
             formParams.append('file', requestParameters['file'] as any);
         }
+
 
 
         let urlPath = `/pet/{petId}/uploadImage`;

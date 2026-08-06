@@ -248,7 +248,6 @@ export class FakeApi extends runtime.BaseAPI {
                 'Required parameter "pet" was null or undefined when calling fakeHttpSignatureTest().'
             );
         }
-
         const queryParameters: any = {};
 
         if (requestParameters['query1'] != null) {
@@ -474,7 +473,6 @@ export class FakeApi extends runtime.BaseAPI {
                 'Required parameter "outerObjectWithEnumProperty" was null or undefined when calling fakePropertyEnumIntegerSerialize().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -521,7 +519,6 @@ export class FakeApi extends runtime.BaseAPI {
                 'Required parameter "body" was null or undefined when calling testBodyWithBinary().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -567,7 +564,6 @@ export class FakeApi extends runtime.BaseAPI {
                 'Required parameter "fileSchemaTestClass" was null or undefined when calling testBodyWithFileSchema().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -613,14 +609,12 @@ export class FakeApi extends runtime.BaseAPI {
                 'Required parameter "query" was null or undefined when calling testBodyWithQueryParams().'
             );
         }
-
         if (requestParameters['user'] == null) {
             throw new runtime.RequiredError(
                 'user',
                 'Required parameter "user" was null or undefined when calling testBodyWithQueryParams().'
             );
         }
-
         const queryParameters: any = {};
 
         if (requestParameters['query'] != null) {
@@ -668,7 +662,6 @@ export class FakeApi extends runtime.BaseAPI {
                 'Required parameter "client" was null or undefined when calling testClientModel().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -717,28 +710,24 @@ export class FakeApi extends runtime.BaseAPI {
                 'Required parameter "number" was null or undefined when calling testEndpointParameters().'
             );
         }
-
         if (requestParameters['_double'] == null) {
             throw new runtime.RequiredError(
                 '_double',
                 'Required parameter "_double" was null or undefined when calling testEndpointParameters().'
             );
         }
-
         if (requestParameters['patternWithoutDelimiter'] == null) {
             throw new runtime.RequiredError(
                 'patternWithoutDelimiter',
                 'Required parameter "patternWithoutDelimiter" was null or undefined when calling testEndpointParameters().'
             );
         }
-
         if (requestParameters['_byte'] == null) {
             throw new runtime.RequiredError(
                 '_byte',
                 'Required parameter "_byte" was null or undefined when calling testEndpointParameters().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -817,6 +806,7 @@ export class FakeApi extends runtime.BaseAPI {
         if (requestParameters['callback'] != null) {
             formParams.append('callback', requestParameters['callback'] as any);
         }
+
 
 
         let urlPath = `/fake`;
@@ -908,6 +898,7 @@ export class FakeApi extends runtime.BaseAPI {
         }
 
 
+
         let urlPath = `/fake`;
 
         return {
@@ -948,21 +939,18 @@ export class FakeApi extends runtime.BaseAPI {
                 'Required parameter "requiredStringGroup" was null or undefined when calling testGroupParameters().'
             );
         }
-
         if (requestParameters['requiredBooleanGroup'] == null) {
             throw new runtime.RequiredError(
                 'requiredBooleanGroup',
                 'Required parameter "requiredBooleanGroup" was null or undefined when calling testGroupParameters().'
             );
         }
-
         if (requestParameters['requiredInt64Group'] == null) {
             throw new runtime.RequiredError(
                 'requiredInt64Group',
                 'Required parameter "requiredInt64Group" was null or undefined when calling testGroupParameters().'
             );
         }
-
         const queryParameters: any = {};
 
         if (requestParameters['requiredStringGroup'] != null) {
@@ -1039,7 +1027,6 @@ export class FakeApi extends runtime.BaseAPI {
                 'Required parameter "requestBody" was null or undefined when calling testInlineAdditionalProperties().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -1087,14 +1074,12 @@ export class FakeApi extends runtime.BaseAPI {
                 'Required parameter "param" was null or undefined when calling testJsonFormData().'
             );
         }
-
         if (requestParameters['param2'] == null) {
             throw new runtime.RequiredError(
                 'param2',
                 'Required parameter "param2" was null or undefined when calling testJsonFormData().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -1120,6 +1105,7 @@ export class FakeApi extends runtime.BaseAPI {
         if (requestParameters['param2'] != null) {
             formParams.append('param2', requestParameters['param2'] as any);
         }
+
 
 
         let urlPath = `/fake/jsonFormData`;
@@ -1162,42 +1148,36 @@ export class FakeApi extends runtime.BaseAPI {
                 'Required parameter "pipe" was null or undefined when calling testQueryParameterCollectionFormat().'
             );
         }
-
         if (requestParameters['ioutil'] == null) {
             throw new runtime.RequiredError(
                 'ioutil',
                 'Required parameter "ioutil" was null or undefined when calling testQueryParameterCollectionFormat().'
             );
         }
-
         if (requestParameters['http'] == null) {
             throw new runtime.RequiredError(
                 'http',
                 'Required parameter "http" was null or undefined when calling testQueryParameterCollectionFormat().'
             );
         }
-
         if (requestParameters['url'] == null) {
             throw new runtime.RequiredError(
                 'url',
                 'Required parameter "url" was null or undefined when calling testQueryParameterCollectionFormat().'
             );
         }
-
         if (requestParameters['context'] == null) {
             throw new runtime.RequiredError(
                 'context',
                 'Required parameter "context" was null or undefined when calling testQueryParameterCollectionFormat().'
             );
         }
-
         if (requestParameters['allowEmpty'] == null) {
             throw new runtime.RequiredError(
                 'allowEmpty',
                 'Required parameter "allowEmpty" was null or undefined when calling testQueryParameterCollectionFormat().'
             );
         }
-
         const queryParameters: any = {};
 
         if (requestParameters['pipe'] != null) {

@@ -113,7 +113,6 @@ export class PetApi extends runtime.BaseAPI {
                 'Required parameter "dummyCat" was null or undefined when calling addPet().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -164,7 +163,6 @@ export class PetApi extends runtime.BaseAPI {
                 'Required parameter "petId" was null or undefined when calling deletePet().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -218,7 +216,6 @@ export class PetApi extends runtime.BaseAPI {
                 'Required parameter "ids" was null or undefined when calling findPetsByIds().'
             );
         }
-
         const queryParameters: any = {};
 
         if (requestParameters['ids'] != null) {
@@ -275,7 +272,6 @@ export class PetApi extends runtime.BaseAPI {
                 'Required parameter "status" was null or undefined when calling findPetsByStatus().'
             );
         }
-
         const queryParameters: any = {};
 
         if (requestParameters['status'] != null) {
@@ -331,7 +327,6 @@ export class PetApi extends runtime.BaseAPI {
                 'Required parameter "tags" was null or undefined when calling findPetsByTags().'
             );
         }
-
         const queryParameters: any = {};
 
         if (requestParameters['tags'] != null) {
@@ -389,7 +384,6 @@ export class PetApi extends runtime.BaseAPI {
                 'Required parameter "ids" was null or undefined when calling findPetsByUserIds().'
             );
         }
-
         const queryParameters: any = {};
 
         if (requestParameters['ids'] != null) {
@@ -446,7 +440,6 @@ export class PetApi extends runtime.BaseAPI {
                 'Required parameter "petId" was null or undefined when calling getPetById().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -497,7 +490,6 @@ export class PetApi extends runtime.BaseAPI {
                 'Required parameter "petId" was null or undefined when calling getPetRegions().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -542,7 +534,6 @@ export class PetApi extends runtime.BaseAPI {
                 'Required parameter "body" was null or undefined when calling updatePet().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -593,14 +584,12 @@ export class PetApi extends runtime.BaseAPI {
                 'Required parameter "petId" was null or undefined when calling updatePetRegions().'
             );
         }
-
         if (requestParameters['newRegions'] == null) {
             throw new runtime.RequiredError(
                 'newRegions',
                 'Required parameter "newRegions" was null or undefined when calling updatePetRegions().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -648,7 +637,6 @@ export class PetApi extends runtime.BaseAPI {
                 'Required parameter "petId" was null or undefined when calling updatePetWithForm().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -679,6 +667,7 @@ export class PetApi extends runtime.BaseAPI {
         if (requestParameters['status'] != null) {
             formParams.append('status', requestParameters['status'] as any);
         }
+
 
 
         let urlPath = `/pet/{petId}`;
@@ -720,7 +709,6 @@ export class PetApi extends runtime.BaseAPI {
                 'Required parameter "petId" was null or undefined when calling uploadFile().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -753,6 +741,7 @@ export class PetApi extends runtime.BaseAPI {
         if (requestParameters['file'] != null) {
             formParams.append('file', requestParameters['file'] as any);
         }
+
 
 
         let urlPath = `/pet/{petId}/uploadImage`;

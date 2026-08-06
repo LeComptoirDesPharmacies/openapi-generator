@@ -47,7 +47,6 @@ export class BehaviorApi extends runtime.BaseAPI {
                 'Required parameter "behaviorId" was null or undefined when calling getBehaviorPermissions().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -92,7 +91,6 @@ export class BehaviorApi extends runtime.BaseAPI {
                 'Required parameter "behaviorId" was null or undefined when calling getBehaviorType().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};

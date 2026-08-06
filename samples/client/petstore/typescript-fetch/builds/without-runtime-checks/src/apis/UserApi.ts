@@ -62,7 +62,6 @@ export class UserApi extends runtime.BaseAPI {
                 'Required parameter "body" was null or undefined when calling createUser().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -110,7 +109,6 @@ export class UserApi extends runtime.BaseAPI {
                 'Required parameter "body" was null or undefined when calling createUsersWithArrayInput().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -156,7 +154,6 @@ export class UserApi extends runtime.BaseAPI {
                 'Required parameter "body" was null or undefined when calling createUsersWithListInput().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -202,7 +199,6 @@ export class UserApi extends runtime.BaseAPI {
                 'Required parameter "username" was null or undefined when calling deleteUser().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -248,7 +244,6 @@ export class UserApi extends runtime.BaseAPI {
                 'Required parameter "username" was null or undefined when calling getUserByName().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -293,14 +288,12 @@ export class UserApi extends runtime.BaseAPI {
                 'Required parameter "username" was null or undefined when calling loginUser().'
             );
         }
-
         if (requestParameters['password'] == null) {
             throw new runtime.RequiredError(
                 'password',
                 'Required parameter "password" was null or undefined when calling loginUser().'
             );
         }
-
         const queryParameters: any = {};
 
         if (requestParameters['username'] != null) {
@@ -392,14 +385,12 @@ export class UserApi extends runtime.BaseAPI {
                 'Required parameter "username" was null or undefined when calling updateUser().'
             );
         }
-
         if (requestParameters['body'] == null) {
             throw new runtime.RequiredError(
                 'body',
                 'Required parameter "body" was null or undefined when calling updateUser().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};

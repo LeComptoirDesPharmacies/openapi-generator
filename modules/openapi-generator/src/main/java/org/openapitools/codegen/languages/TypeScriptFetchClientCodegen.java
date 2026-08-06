@@ -391,6 +391,10 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
         ImmutableMap.Builder<String, Mustache.Lambda> lambdas = super.addMustacheLambdas();
         lambdas.put("indented_star_1", new IndentedLambda(1, " ", "* ", false, false));
         lambdas.put("indented_star_4", new IndentedLambda(5, " ", "* ", false, false));
+        // the shared indented_N lambdas indent blank lines too, leaving trailing whitespace; these skip
+        // them, so a flush-left partial can be shared between call sites at different depths
+        lambdas.put("indented_8_skip_blank", new IndentedLambda(8, " ", false, true));
+        lambdas.put("indented_16_skip_blank", new IndentedLambda(16, " ", false, true));
         return lambdas;
     }
 

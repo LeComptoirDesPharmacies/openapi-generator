@@ -152,7 +152,12 @@ export class {{classname}} extends runtime.BaseAPI {
         {{! the body only exists on one member of the request union, so indexing it here would not
             type-check - and would narrow the union for everything below. Guarded in the switch instead. }}
         {{^isBodyParam}}
-{{>apisRequiredParamCheck}}
+        if (requestParameters['{{paramName}}'] == null) {
+            throw new runtime.RequiredError(
+                '{{paramName}}',
+                'Required parameter "{{paramName}}" was null or undefined when calling {{nickname}}().'
+            );
+        }
         {{/isBodyParam}}
         {{/required}}
         {{/allParams}}
@@ -160,7 +165,12 @@ export class {{classname}} extends runtime.BaseAPI {
         {{^vendorExtensions.x-content-type-has-request-variants}}
         {{#allParams}}
         {{#required}}
-{{>apisRequiredParamCheck}}
+        if (requestParameters['{{paramName}}'] == null) {
+            throw new runtime.RequiredError(
+                '{{paramName}}',
+                'Required parameter "{{paramName}}" was null or undefined when calling {{nickname}}().'
+            );
+        }
         {{/required}}
         {{/allParams}}
         {{/vendorExtensions.x-content-type-has-request-variants}}
@@ -274,73 +284,7 @@ export class {{classname}} extends runtime.BaseAPI {
         {{/isOAuth}}
         {{/authMethods}}
         {{#hasFormParams}}
-        const consumes: runtime.Consume[] = [
-            {{#consumes}}
-            { contentType: '{{{mediaType}}}' },
-            {{/consumes}}
-        ];
-        // @ts-ignore: canConsumeForm may be unused
-        const canConsumeForm = runtime.canConsumeForm(consumes);
-
-        let formParams: { append(param: string, value: any): any };
-        let useForm = false;
-        {{#formParams}}
-        {{#isFile}}
-        // use FormData to transmit files using content-type "multipart/form-data"
-        useForm = canConsumeForm;
-        {{/isFile}}
-        {{/formParams}}
-        if (useForm) {
-            formParams = new FormData();
-        } else {
-            formParams = new URLSearchParams();
-        }
-
-        {{#formParams}}
-        {{#isArray}}
-        if (requestParameters['{{paramName}}'] != null) {
-            {{#isCollectionFormatMulti}}
-            requestParameters['{{paramName}}'].forEach((element) => {
-                formParams.append('{{baseName}}{{#useSquareBracketsInArrayNames}}[]{{/useSquareBracketsInArrayNames}}', element as any);
-            })
-            {{/isCollectionFormatMulti}}
-            {{^isCollectionFormatMulti}}
-            formParams.append('{{baseName}}{{#useSquareBracketsInArrayNames}}[]{{/useSquareBracketsInArrayNames}}', {{#uniqueItems}}Array.from({{/uniqueItems}}requestParameters['{{paramName}}']{{#uniqueItems}}){{/uniqueItems}}!.join(runtime.COLLECTION_FORMATS["{{collectionFormat}}"]));
-            {{/isCollectionFormatMulti}}
-        }
-
-        {{/isArray}}
-        {{^isArray}}
-        if (requestParameters['{{paramName}}'] != null) {
-            {{#isDateTimeType}}
-            formParams.append('{{baseName}}', (requestParameters['{{paramName}}'] as any).toISOString());
-            {{/isDateTimeType}}
-            {{^isDateTimeType}}
-            {{#isPrimitiveType}}
-            formParams.append('{{baseName}}', requestParameters['{{paramName}}'] as any);
-            {{/isPrimitiveType}}
-            {{^isPrimitiveType}}
-            {{#isEnumRef}}
-            formParams.append('{{baseName}}', requestParameters['{{paramName}}'] as any);
-            {{/isEnumRef}}
-            {{^isEnumRef}}
-            {{^withoutRuntimeChecks}}
-            {{^isContainer}}
-            formParams.append('{{baseName}}', new Blob([JSON.stringify({{{dataType}}}ToJSON(requestParameters['{{paramName}}']))], { type: "application/json", }));
-            {{/isContainer}}
-            {{#isContainer}}
-            formParams.append('{{baseName}}', new Blob([JSON.stringify(requestParameters['{{paramName}}'])], { type: "application/json", }));
-            {{/isContainer}}
-            {{/withoutRuntimeChecks}}{{#withoutRuntimeChecks}}
-            formParams.append('{{baseName}}', new Blob([JSON.stringify(requestParameters['{{paramName}}'])], { type: "application/json", }));
-            {{/withoutRuntimeChecks}}
-            {{/isEnumRef}}
-            {{/isPrimitiveType}}
-            {{/isDateTimeType}}
-        }
-
-        {{/isArray}}
-        {{/formParams}}
+        {{#lambda.indented_8_skip_blank}}{{>apisFormParams}}{{/lambda.indented_8_skip_blank}}
         {{/hasFormParams}}
 
         let urlPath = `{{{path}}}`;

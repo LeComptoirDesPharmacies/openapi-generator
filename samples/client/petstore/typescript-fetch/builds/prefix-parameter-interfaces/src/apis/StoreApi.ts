@@ -46,7 +46,6 @@ export class StoreApi extends runtime.BaseAPI {
                 'Required parameter "orderId" was null or undefined when calling deleteOrder().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -135,7 +134,6 @@ export class StoreApi extends runtime.BaseAPI {
                 'Required parameter "orderId" was null or undefined when calling getOrderById().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -182,7 +180,6 @@ export class StoreApi extends runtime.BaseAPI {
                 'Required parameter "body" was null or undefined when calling placeOrder().'
             );
         }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
