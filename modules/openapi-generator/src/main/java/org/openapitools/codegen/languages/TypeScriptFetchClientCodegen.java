@@ -80,7 +80,6 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
     private static final String X_CT_RESPONSE_DISPATCH = "x-content-type-response-dispatch";
     private static final String X_CT_HAS_REQUEST_VARIANTS = "x-content-type-has-request-variants";
     private static final String X_CT_HAS_RESPONSE_VARIANTS = "x-content-type-has-response-variants";
-    private static final String X_CT_DEFAULT_REQUEST = "x-content-type-default-request";
     private static final String X_CT_DEFAULT_RESPONSE = "x-content-type-default-response";
 
     @Getter @Setter
@@ -1006,7 +1005,6 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
 
         // identity-based: CodegenOperation.hashCode() walks the whole operation, and two variants of the
         // same operation are very nearly equal
-        Set<CodegenOperation> merged = Collections.newSetFromMap(new IdentityHashMap<>());
         Set<CodegenOperation> superseded = Collections.newSetFromMap(new IdentityHashMap<>());
         for (List<CodegenOperation> variants : groups.values()) {
             if (variants.size() < 2) {
@@ -1026,23 +1024,23 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
             base.vendorExtensions.put(X_CT_MERGED, true);
             base.vendorExtensions.put(X_CT_REQUEST_VARIANTS, requestVariants);
             base.vendorExtensions.put(X_CT_RESPONSE_VARIANTS, responseVariants);
-            // the same variants, but ordered for an if / else if / else chain: the default content-type is
-            // the fallback, so it comes last there rather than first
-            List<Map<String, Object>> responseDispatch = new ArrayList<>(responseVariants.subList(1, responseVariants.size()));
-            responseDispatch.add(responseVariants.get(0));
-            base.vendorExtensions.put(X_CT_RESPONSE_DISPATCH, responseDispatch);
             base.vendorExtensions.put(X_CT_HAS_REQUEST_VARIANTS, requestVariants.size() > 1);
             base.vendorExtensions.put(X_CT_HAS_RESPONSE_VARIANTS, responseVariants.size() > 1);
-            base.vendorExtensions.put(X_CT_DEFAULT_REQUEST, requestVariants.get(0).get("mediaType"));
             base.vendorExtensions.put(X_CT_DEFAULT_RESPONSE, responseVariants.get(0).get("mediaType"));
+            if (responseVariants.size() > 1) {
+                // the same variants, but ordered for an if / else if / else chain: the default content-type
+                // is the fallback, so it comes last there rather than first. Only meaningful beyond one
+                // variant - a single one would be both the chain's first and last branch.
+                List<Map<String, Object>> dispatch = new ArrayList<>(responseVariants.subList(1, responseVariants.size()));
+                dispatch.add(responseVariants.get(0));
+                base.vendorExtensions.put(X_CT_RESPONSE_DISPATCH, dispatch);
+            }
 
-            merged.add(base);
             variants.stream().filter(op -> op != base).forEach(superseded::add);
         }
 
-        if (!merged.isEmpty()) {
-            allOperations.removeAll(superseded);
-        }
+        // identity-based membership, so a variant is dropped without being compared field by field
+        allOperations.removeAll(superseded);
     }
 
     /**
