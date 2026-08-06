@@ -1059,11 +1059,39 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
      * expects as the generator resolved it. A single-element list means the request axis was not split.
      */
     private List<Map<String, Object>> requestVariantsOf(List<CodegenOperation> variants) {
-        return variantsByMediaType(variants, CodegenConstants.X_CONTENT_TYPE_VARIANT_REQUEST,
+        List<Map<String, Object>> entries = variantsByMediaType(variants,
+                CodegenConstants.X_CONTENT_TYPE_VARIANT_REQUEST,
                 CodegenConstants.X_CONTENT_TYPE_VARIANT_REQUEST_INDEX, (entry, variant) -> {
                     entry.put("allParams", variant.allParams);
                     entry.put("bodyParam", variant.bodyParam);
                 });
+        excludeOtherVariantsBodies(entries);
+        return entries;
+    }
+
+    /**
+     * Records, for each member of the request union, the body properties that belong to the <em>other</em>
+     * members, so the template can declare them {@code never} there.
+     * <p>
+     * Without it the union is only safe against object literals. Excess property checking does not apply to
+     * a variable, so a caller could hand an XML body to the JSON member — the extra property would simply be
+     * ignored and the body would go out under the wrong content-type. That escape is only closed by the
+     * other checks TypeScript happens to apply (weak type detection when every property of a member is
+     * optional, a missing required property otherwise); a member with a required parameter and an optional
+     * body has neither.
+     */
+    private void excludeOtherVariantsBodies(List<Map<String, Object>> entries) {
+        Set<String> everyBodyName = entries.stream()
+                .map(entry -> (CodegenParameter) entry.get("bodyParam"))
+                .filter(Objects::nonNull)
+                .map(param -> param.paramName)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        for (Map<String, Object> entry : entries) {
+            CodegenParameter own = (CodegenParameter) entry.get("bodyParam");
+            entry.put("excludedParams", everyBodyName.stream()
+                    .filter(name -> own == null || !name.equals(own.paramName))
+                    .collect(Collectors.toList()));
+        }
     }
 
     /**

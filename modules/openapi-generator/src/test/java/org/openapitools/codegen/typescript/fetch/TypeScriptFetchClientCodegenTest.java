@@ -90,8 +90,8 @@ public class TypeScriptFetchClientCodegenTest {
         // request axis: a union discriminated by contentType, whose value selects the body's type. The
         // content-type declared first is the default one, hence optional.
         TestUtils.assertFileContains(api,
-                "| { contentType?: 'application/json'; report?: Report; }",
-                "| { contentType: 'application/xml'; reportXml?: ReportXml; }");
+                "| { contentType?: 'application/json'; report?: Report; reportXml?: never; }",
+                "| { contentType: 'application/xml'; reportXml?: ReportXml; report?: never; }");
 
         // response axis: one overload per content-type, `accept` selecting the return type
         TestUtils.assertFileContains(api,
@@ -105,6 +105,44 @@ public class TypeScriptFetchClientCodegenTest {
                 "headerParameters['Content-Type'] = requestParameters.contentType ?? 'application/json';",
                 "headerParameters['Accept'] = requestParameters.accept ?? 'application/json';",
                 "if (responseContentType.startsWith('application/pdf')) {");
+    }
+
+    @Test
+    public void testRequestUnionExcludesTheOtherVariantsBodies() throws IOException {
+        File output = Files.createTempDirectory("test").toFile();
+        output.deleteOnExit();
+
+        final CodegenConfigurator configurator = new CodegenConfigurator()
+                .setGeneratorName("typescript-fetch")
+                .setInputSpec("src/test/resources/3_0/issue6708-split-by-content-type-required-body.yaml")
+                .addGlobalProperty(CodegenConstants.SPLIT_OPERATIONS_BY_CONTENT_TYPE, "true")
+                .setOutputDir(output.getAbsolutePath().replace("\\", "/"));
+
+        Generator generator = new DefaultGenerator();
+        generator.opts(configurator.toClientOptInput()).generate().forEach(File::deleteOnExit);
+
+        Path api = Paths.get(output + "/apis/ReportApi.ts");
+
+        // Each member declares the other members' bodies as `never`. Excess property checking would catch an
+        // object literal handing an XML body to the JSON member, but not a variable; and the checks
+        // TypeScript falls back on do not cover a member that has a required parameter and an optional body,
+        // as createDraft does.
+        TestUtils.assertFileContains(api,
+                "| { contentType?: 'application/json'; projectId: string; report?: Report; reportXml?: never; }",
+                "| { contentType: 'application/xml'; projectId: string; reportXml?: ReportXml; report?: never; }");
+
+        // A required body only exists on one member of the union, so it cannot be guarded before the switch:
+        // indexing it there would not type-check, and would narrow the union for everything below.
+        TestUtils.assertFileContains(api,
+                "                if (requestParameters['reportXml'] == null) {",
+                "                if (requestParameters['report'] == null) {");
+
+        String content = Files.readString(api);
+        int requestOpts = content.indexOf("async createProjectReportRequestOpts");
+        int contentTypeSwitch = content.indexOf("switch (requestParameters.contentType)", requestOpts);
+        assertThat(content.substring(requestOpts, contentTypeSwitch))
+                .as("the body must not be indexed before the content-type is known")
+                .doesNotContain("requestParameters['report']");
     }
 
     @Test

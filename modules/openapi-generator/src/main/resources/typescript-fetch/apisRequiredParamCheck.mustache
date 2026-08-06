@@ -1,0 +1,8 @@
+{{! Runtime guard for one required parameter. Context: the parameter. }}
+        if (requestParameters['{{paramName}}'] == null) {
+            throw new runtime.RequiredError(
+                '{{paramName}}',
+                'Required parameter "{{paramName}}" was null or undefined when calling {{nickname}}().'
+            );
+        }
+

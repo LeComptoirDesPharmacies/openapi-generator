@@ -45,13 +45,17 @@ selected by overloads on `accept`.
 
 ```ts
 export type CreateReportRequest =
-    | { contentType?: 'application/json'; report?: Report; }
-    | { contentType: 'application/xml'; reportXml?: ReportXml; }
+    | { contentType?: 'application/json'; report?: Report; reportXml?: never; }
+    | { contentType: 'application/xml'; reportXml?: ReportXml; report?: never; }
 ;
 
 async createReport(requestParameters: CreateReportRequest & { accept?: 'application/json' }, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Receipt>;
 async createReport(requestParameters: CreateReportRequest & { accept: 'application/pdf' }, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob>;
 ```
+
+Each member declares the other members' bodies as `never`. Excess property checking would already catch an
+object literal handing an XML body to the JSON member, but it does not apply to a variable, and the checks
+TypeScript falls back on then leave a gap for a member that has a required parameter and an optional body.
 
 Two cases are left split rather than merged, with a warning. An operation accepting several request
 content-types one of which is a form or multipart body, because such a body is spread over individual

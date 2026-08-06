@@ -27,7 +27,7 @@ import {
     content-type, discriminated by `contentType`, whose value selects the body's type }}
 export type {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request =
 {{#vendorExtensions.x-content-type-request-variants}}
-    | { {{#vendorExtensions.x-content-type-has-request-variants}}contentType{{#isDefault}}?{{/isDefault}}: '{{mediaType}}'; {{/vendorExtensions.x-content-type-has-request-variants}}{{#allParams}}{{paramName}}{{^required}}?{{/required}}: {{#isEnum}}{{{datatypeWithEnum}}}{{/isEnum}}{{^isEnum}}{{#hasReadOnly}}Omit<{{{dataType}}}, {{#readOnlyVars}}'{{baseName}}'{{^-last}}|{{/-last}}{{/readOnlyVars}}>{{/hasReadOnly}}{{^hasReadOnly}}{{{dataType}}}{{/hasReadOnly}}{{#isNullable}} | null{{/isNullable}}{{/isEnum}}; {{/allParams}}}
+    | { {{#vendorExtensions.x-content-type-has-request-variants}}contentType{{#isDefault}}?{{/isDefault}}: '{{mediaType}}'; {{/vendorExtensions.x-content-type-has-request-variants}}{{#allParams}}{{paramName}}{{^required}}?{{/required}}: {{#isEnum}}{{{datatypeWithEnum}}}{{/isEnum}}{{^isEnum}}{{#hasReadOnly}}Omit<{{{dataType}}}, {{#readOnlyVars}}'{{baseName}}'{{^-last}}|{{/-last}}{{/readOnlyVars}}>{{/hasReadOnly}}{{^hasReadOnly}}{{{dataType}}}{{/hasReadOnly}}{{#isNullable}} | null{{/isNullable}}{{/isEnum}}; {{/allParams}}{{#excludedParams}}{{.}}?: never; {{/excludedParams}}}
 {{/vendorExtensions.x-content-type-request-variants}}
 ;
 
@@ -142,17 +142,26 @@ export class {{classname}} extends runtime.BaseAPI {
      {{/isDeprecated}}
      */
     async {{nickname}}RequestOpts({{#vendorExtensions.x-content-type-merged}}requestParameters: {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request{{#vendorExtensions.x-content-type-has-response-variants}} & { accept?: string }{{/vendorExtensions.x-content-type-has-response-variants}}{{/vendorExtensions.x-content-type-merged}}{{^vendorExtensions.x-content-type-merged}}{{#allParams.0}}requestParameters: {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request{{/allParams.0}}{{/vendorExtensions.x-content-type-merged}}): Promise<runtime.RequestOpts> {
+        {{! the conditional has to sit outside the parameter loop below: in a parameter's context,
+            `vendorExtensions` resolves to that parameter's own map and never to the operation's }}
+        {{#vendorExtensions.x-content-type-has-request-variants}}
         {{#allParams}}
         {{#required}}
-        if (requestParameters['{{paramName}}'] == null) {
-            throw new runtime.RequiredError(
-                '{{paramName}}',
-                'Required parameter "{{paramName}}" was null or undefined when calling {{nickname}}().'
-            );
-        }
-
+        {{! the body only exists on one member of the request union, so indexing it here would not
+            type-check - and would narrow the union for everything below. Guarded in the switch instead. }}
+        {{^isBodyParam}}
+{{>apisRequiredParamCheck}}
+        {{/isBodyParam}}
         {{/required}}
         {{/allParams}}
+        {{/vendorExtensions.x-content-type-has-request-variants}}
+        {{^vendorExtensions.x-content-type-has-request-variants}}
+        {{#allParams}}
+        {{#required}}
+{{>apisRequiredParamCheck}}
+        {{/required}}
+        {{/allParams}}
+        {{/vendorExtensions.x-content-type-has-request-variants}}
         const queryParameters: any = {};
 
         {{#queryParams}}
@@ -362,6 +371,16 @@ export class {{classname}} extends runtime.BaseAPI {
         {{#vendorExtensions.x-content-type-request-variants}}
         {{^isDefault}}
             case '{{mediaType}}':
+        {{#bodyParam}}
+        {{#required}}
+                if (requestParameters['{{paramName}}'] == null) {
+                    throw new runtime.RequiredError(
+                        '{{paramName}}',
+                        'Required parameter "{{paramName}}" was null or undefined when calling {{nickname}}().'
+                    );
+                }
+        {{/required}}
+        {{/bodyParam}}
                 body = {{#bodyParam}}{{>apisRequestBodyValue}}{{/bodyParam}}{{^bodyParam}}undefined{{/bodyParam}};
                 break;
         {{/isDefault}}
@@ -369,6 +388,16 @@ export class {{classname}} extends runtime.BaseAPI {
         {{#vendorExtensions.x-content-type-request-variants}}
         {{#isDefault}}
             default:
+        {{#bodyParam}}
+        {{#required}}
+                if (requestParameters['{{paramName}}'] == null) {
+                    throw new runtime.RequiredError(
+                        '{{paramName}}',
+                        'Required parameter "{{paramName}}" was null or undefined when calling {{nickname}}().'
+                    );
+                }
+        {{/required}}
+        {{/bodyParam}}
                 body = {{#bodyParam}}{{>apisRequestBodyValue}}{{/bodyParam}}{{^bodyParam}}undefined{{/bodyParam}};
         {{/isDefault}}
         {{/vendorExtensions.x-content-type-request-variants}}
