@@ -1097,14 +1097,6 @@ public class DefaultCodegen implements CodegenConfig {
                 : ModelUtils.getReferencedApiResponse(openAPI, operation.getResponses().get(methodResponseCode));
         List<String> responseAxis = axisOf(methodResponse == null ? null : methodResponse.getContent());
 
-        // Every operation gets the content-type it answers with by default, divided or not, so a generator
-        // can always send a matching Accept header rather than only on the operations it had to divide.
-        // Read from the method response rather than from `produces`, which aggregates the error responses too.
-        if (methodResponse != null && methodResponse.getContent() != null && !methodResponse.getContent().isEmpty()) {
-            operation.addExtension(CodegenConstants.X_CONTENT_TYPE_DEFAULT_RESPONSE,
-                    methodResponse.getContent().keySet().iterator().next());
-        }
-
         if (requestAxis.size() == 1 && responseAxis.size() == 1) {
             return Collections.singletonList(operation); // single content-type on both axes: nothing to divide
         }
@@ -1112,11 +1104,14 @@ public class DefaultCodegen implements CodegenConfig {
         // Both axes are in declaration order, so rank 0 is the default content-type, consistently with the
         // rest of the generator: addConsumesInfo keeps that order and templates read consumes.0.
         String baseId = getOrGenerateOperationId(operation, path, httpMethod);
+        Map<String, String> requestTokens = axisTokens(requestAxis);
+        Map<String, String> responseTokens = axisTokens(responseAxis);
         List<Operation> variants = new ArrayList<>(requestAxis.size() * responseAxis.size());
         for (String requestMediaType : requestAxis) {
             for (String responseMediaType : responseAxis) {
                 Operation variant = buildOperationVariant(openAPI, operation, baseId, requestMediaType,
-                        responseMediaType, methodResponseCode, methodResponse);
+                        requestTokens.get(requestMediaType), responseMediaType,
+                        responseTokens.get(responseMediaType), methodResponseCode, methodResponse);
                 // the rank travels with the variant: the operations are reordered before they reach a
                 // generator, so their position in the list is no longer the order declared in the spec
                 tagContentTypeVariant(variant, baseId,
@@ -1173,8 +1168,10 @@ public class DefaultCodegen implements CodegenConfig {
      * Builds one operation variant narrowed to a single request and/or response media-type (a {@code null}
      * media-type leaves that axis untouched), with a typed, collision-free operationId.
      */
-    private Operation buildOperationVariant(OpenAPI openAPI, Operation original, String baseId, String requestMediaType,
-                                            String responseMediaType, String targetResponseCode, ApiResponse targetResponse) {
+    private Operation buildOperationVariant(OpenAPI openAPI, Operation original, String baseId,
+                                            String requestMediaType, String requestToken,
+                                            String responseMediaType, String responseToken,
+                                            String targetResponseCode, ApiResponse targetResponse) {
         boolean openapi31 = specVersionGreaterThanOrEqualTo310(openAPI);
         Operation variant = ModelUtils.cloneOperation(original, openapi31);
         // generators (e.g. SpringCodegen) read the extensions map without null-guards
@@ -1185,10 +1182,10 @@ public class DefaultCodegen implements CodegenConfig {
         // typed, collision-free operationId: request -> "With<Subtype>", response -> "As<Subtype>"
         StringBuilder operationId = new StringBuilder(baseId);
         if (requestMediaType != null) {
-            operationId.append("With").append(camelize(subtypeToken(requestMediaType)));
+            operationId.append("With").append(camelize(requestToken));
         }
         if (responseMediaType != null) {
-            operationId.append("As").append(camelize(subtypeToken(responseMediaType)));
+            operationId.append("As").append(camelize(responseToken));
         }
         variant.setOperationId(operationId.toString());
 
@@ -1247,7 +1244,40 @@ public class DefaultCodegen implements CodegenConfig {
         if (schema.getItems() != null) {
             key.append("|items=").append(schemaKey(schema.getItems()));
         }
+        // the property names too: without them two different inline object schemas share a key, and the
+        // media-type of the second one is dropped from the generated client with nothing said
+        if (schema.getProperties() != null) {
+            key.append("|props=").append(new TreeSet<>(schema.getProperties().keySet()));
+        }
+        if (schema.getAdditionalProperties() instanceof Schema) {
+            key.append("|addProps=").append(schemaKey((Schema) schema.getAdditionalProperties()));
+        }
         return key.toString();
+    }
+
+    /**
+     * A token per media-type of an axis, unique within it: the subtype alone where it identifies the
+     * media-type, the whole type otherwise — {@code text/csv} and {@code application/csv} would both be
+     * {@code Csv} and give two variants the same operationId.
+     */
+    private static Map<String, String> axisTokens(List<String> axis) {
+        Map<String, Long> bySubtype = axis.stream().filter(Objects::nonNull)
+                .collect(Collectors.groupingBy(DefaultCodegen::subtypeToken, Collectors.counting()));
+        Map<String, String> tokens = new HashMap<>();
+        for (String mediaType : axis) {
+            if (mediaType == null) {
+                continue;
+            }
+            String subtype = subtypeToken(mediaType);
+            tokens.put(mediaType, bySubtype.get(subtype) > 1
+                    ? sanitizeToken(mediaType) : subtype);
+        }
+        return tokens;
+    }
+
+    /** Whole media-type reduced to an identifier, e.g. {@code text_csv} from {@code text/csv}. */
+    private static String sanitizeToken(String mediaType) {
+        return mediaType.replaceAll("\\+.*$", "").replaceAll("[^a-zA-Z0-9]+", "_");
     }
 
     /** Token derived from a media-type subtype, e.g. {@code Directlog} from {@code application/directlog}. */

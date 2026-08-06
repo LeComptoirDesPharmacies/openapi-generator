@@ -1026,6 +1026,8 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
             merged.contentTypeResponseVariants = responseVariants;
             merged.hasContentTypeRequestVariants = requestVariants.size() > 1;
             merged.hasContentTypeResponseVariants = responseVariants.size() > 1;
+            base.vendorExtensions.put(CodegenConstants.X_CONTENT_TYPE_DEFAULT_RESPONSE,
+                    responseVariants.get(0).mediaType);
             if (responseVariants.size() > 1) {
                 // the same variants, but ordered for an if / else if / else chain: the default content-type
                 // is the fallback, so it comes last there rather than first. Only meaningful beyond one

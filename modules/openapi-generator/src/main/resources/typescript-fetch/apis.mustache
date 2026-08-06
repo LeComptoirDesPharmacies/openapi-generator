@@ -211,12 +211,12 @@ export class {{classname}} extends runtime.BaseAPI {
 
         {{! Content-Type is set per content-type in the switch below, where the body is built: a multipart
             body must not set it at all, fetch adds it with the boundary it generates }}
-        {{! Accept is sent on every operation while the option is on, not only on the ones that were
-            divided: the content-type an operation answers with is known either way. }}
-        {{#vendorExtensions.x-content-type-default-response}}
-        headerParameters['Accept'] = {{#hasContentTypeResponseVariants}}requestParameters.accept ?? {{/hasContentTypeResponseVariants}}'{{.}}';
+        {{! only where the response axis was actually divided: elsewhere the caller may have pinned an
+            Accept on the Configuration, and an operation-level one silently wins over it }}
+        {{#hasContentTypeResponseVariants}}
+        headerParameters['Accept'] = requestParameters.accept ?? '{{vendorExtensions.x-content-type-default-response}}';
 
-        {{/vendorExtensions.x-content-type-default-response}}
+        {{/hasContentTypeResponseVariants}}
         {{^hasContentTypeRequestVariants}}
         {{#bodyParam}}
         {{^consumes}}
@@ -283,9 +283,13 @@ export class {{classname}} extends runtime.BaseAPI {
 
         {{/isOAuth}}
         {{/authMethods}}
+        {{! a request-split operation assembles its form body inside the content-type switch instead, where
+            the union is narrowed; emitting it here too would shadow those declarations }}
+        {{^hasContentTypeRequestVariants}}
         {{#hasFormParams}}
         {{#lambda.indented_8_skip_blank}}{{>apisFormParams}}{{/lambda.indented_8_skip_blank}}
         {{/hasFormParams}}
+        {{/hasContentTypeRequestVariants}}
 
         let urlPath = `{{{path}}}`;
         {{#pathParams}}
@@ -401,14 +405,16 @@ export class {{classname}} extends runtime.BaseAPI {
 
         {{! dispatch on the content-type the server actually returned, not on the requested `accept`:
             the header is a request, and a server is free not to honour it }}
-        const responseContentType = response.headers.get('content-type') ?? '';
+        {{! type/subtype only, compared exactly: startsWith would let application/json win over
+            application/json-patch+json, and a `; charset=` parameter would defeat an equality test }}
+        const responseContentType = (response.headers.get('content-type') ?? '').split(';')[0].trim();
     {{#contentTypeResponseDispatch}}
     {{#-first}}
-        if (responseContentType.startsWith('{{mediaType}}')) {
+        if (responseContentType === '{{mediaType}}') {
     {{/-first}}
     {{^-first}}
     {{^-last}}
-        } else if (responseContentType.startsWith('{{mediaType}}')) {
+        } else if (responseContentType === '{{mediaType}}') {
     {{/-last}}
     {{/-first}}
     {{#-last}}
