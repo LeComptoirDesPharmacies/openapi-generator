@@ -1097,6 +1097,14 @@ public class DefaultCodegen implements CodegenConfig {
                 : ModelUtils.getReferencedApiResponse(openAPI, operation.getResponses().get(methodResponseCode));
         List<String> responseAxis = axisOf(methodResponse == null ? null : methodResponse.getContent());
 
+        // Every operation gets the content-type it answers with by default, divided or not, so a generator
+        // can always send a matching Accept header rather than only on the operations it had to divide.
+        // Read from the method response rather than from `produces`, which aggregates the error responses too.
+        if (methodResponse != null && methodResponse.getContent() != null && !methodResponse.getContent().isEmpty()) {
+            operation.addExtension(CodegenConstants.X_CONTENT_TYPE_DEFAULT_RESPONSE,
+                    methodResponse.getContent().keySet().iterator().next());
+        }
+
         if (requestAxis.size() == 1 && responseAxis.size() == 1) {
             return Collections.singletonList(operation); // single content-type on both axes: nothing to divide
         }

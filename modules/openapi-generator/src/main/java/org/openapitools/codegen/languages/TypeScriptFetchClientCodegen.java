@@ -80,7 +80,6 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
     private static final String X_CT_RESPONSE_DISPATCH = "x-content-type-response-dispatch";
     private static final String X_CT_HAS_REQUEST_VARIANTS = "x-content-type-has-request-variants";
     private static final String X_CT_HAS_RESPONSE_VARIANTS = "x-content-type-has-response-variants";
-    private static final String X_CT_DEFAULT_RESPONSE = "x-content-type-default-response";
 
     @Getter @Setter
     protected String npmRepository = null;
@@ -1031,7 +1030,6 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
             base.vendorExtensions.put(X_CT_RESPONSE_VARIANTS, responseVariants);
             base.vendorExtensions.put(X_CT_HAS_REQUEST_VARIANTS, requestVariants.size() > 1);
             base.vendorExtensions.put(X_CT_HAS_RESPONSE_VARIANTS, responseVariants.size() > 1);
-            base.vendorExtensions.put(X_CT_DEFAULT_RESPONSE, responseVariants.get(0).get("mediaType"));
             if (responseVariants.size() > 1) {
                 // the same variants, but ordered for an if / else if / else chain: the default content-type
                 // is the fallback, so it comes last there rather than first. Only meaningful beyond one

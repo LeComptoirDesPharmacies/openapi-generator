@@ -167,6 +167,13 @@ public class CodegenConstants {
      * content-type of that axis; the variant ranked 0 on both axes is the one a caller gets without asking.
      * An axis that was not split has no media-type and ranks 0.
      */
+    /**
+     * The content-type an operation answers with by default: the first one declared on the response the
+     * return type is derived from. Set on every operation while the option is on, divided or not, so that a
+     * generator can always send a matching Accept header.
+     */
+    public static final String X_CONTENT_TYPE_DEFAULT_RESPONSE = "x-content-type-default-response";
+
     public static final String X_CONTENT_TYPE_VARIANT_REQUEST_INDEX = "x-content-type-variant-request-index";
     public static final String X_CONTENT_TYPE_VARIANT_RESPONSE_INDEX = "x-content-type-variant-response-index";
 

@@ -192,6 +192,12 @@ public class TypeScriptFetchClientCodegenTest {
         // POST /upload has a single, multipart request content-type and two response content-types: only the
         // response axis is split, and merging it just adds `accept` to the request object.
         TestUtils.assertFileNotContains(api, "uploadAsJson", "uploadAsPdf");
+
+        // Accept is emitted on every operation while the option is on, not only on the divided ones:
+        // `convert` answers with a single content-type and still announces it.
+        TestUtils.assertFileContains(api,
+                "headerParameters['Accept'] = 'application/json';",
+                "headerParameters['Accept'] = requestParameters.accept ?? 'application/json';");
         TestUtils.assertFileContains(api,
                 "async upload(requestParameters: UploadRequest & { accept?: 'application/json' }",
                 "async upload(requestParameters: UploadRequest & { accept: 'application/pdf' }");

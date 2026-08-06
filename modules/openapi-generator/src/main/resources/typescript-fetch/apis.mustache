@@ -201,10 +201,12 @@ export class {{classname}} extends runtime.BaseAPI {
 
         {{! Content-Type is set per content-type in the switch below, where the body is built: a multipart
             body must not set it at all, fetch adds it with the boundary it generates }}
-        {{#vendorExtensions.x-content-type-has-response-variants}}
-        headerParameters['Accept'] = requestParameters.accept ?? '{{vendorExtensions.x-content-type-default-response}}';
+        {{! Accept is sent on every operation while the option is on, not only on the ones that were
+            divided: the content-type an operation answers with is known either way. }}
+        {{#vendorExtensions.x-content-type-default-response}}
+        headerParameters['Accept'] = {{#vendorExtensions.x-content-type-has-response-variants}}requestParameters.accept ?? {{/vendorExtensions.x-content-type-has-response-variants}}'{{.}}';
 
-        {{/vendorExtensions.x-content-type-has-response-variants}}
+        {{/vendorExtensions.x-content-type-default-response}}
         {{^vendorExtensions.x-content-type-has-request-variants}}
         {{#bodyParam}}
         {{^consumes}}
