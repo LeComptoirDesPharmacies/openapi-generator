@@ -1073,12 +1073,12 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
      * Records, for each member of the request union, the body properties that belong to the <em>other</em>
      * members, so the template can declare them {@code never} there.
      * <p>
-     * Without it the union is only safe against object literals. Excess property checking does not apply to
-     * a variable, so a caller could hand an XML body to the JSON member — the extra property would simply be
-     * ignored and the body would go out under the wrong content-type. That escape is only closed by the
-     * other checks TypeScript happens to apply (weak type detection when every property of a member is
-     * optional, a missing required property otherwise); a member with a required parameter and an optional
-     * body has neither.
+     * Without it a caller can hand an XML body to the JSON member and have it silently sent as JSON. Excess
+     * property checking, which would normally reject the surplus property, is no help: against a union it
+     * treats a key present in <em>any</em> member as known, so it never fires — for an object literal no
+     * more than for a variable. What rejects most shapes is unrelated: weak type detection when every
+     * property of a member is optional, a missing required property otherwise. A member with a required
+     * parameter and an optional body has neither.
      */
     private void excludeOtherVariantsBodies(List<Map<String, Object>> entries) {
         Set<String> everyBodyName = entries.stream()

@@ -53,9 +53,12 @@ async createReport(requestParameters: CreateReportRequest & { accept?: 'applicat
 async createReport(requestParameters: CreateReportRequest & { accept: 'application/pdf' }, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob>;
 ```
 
-Each member declares the other members' bodies as `never`. Excess property checking would already catch an
-object literal handing an XML body to the JSON member, but it does not apply to a variable, and the checks
-TypeScript falls back on then leave a gap for a member that has a required parameter and an optional body.
+Each member declares the other members' bodies as `never`. Without it nothing stops a caller from handing an
+XML body to the JSON member and having it silently sent as JSON: excess property checking, which would
+normally reject the surplus property, treats a key present in *any* member of a union as known, so it never
+fires here — for an object literal no more than for a variable. What rejects most shapes is unrelated: weak
+type detection when every property of a member is optional, a missing required property otherwise. A member
+with a required parameter and an optional body has neither.
 
 Two cases are left split rather than merged, with a warning. An operation accepting several request
 content-types one of which is a form or multipart body, because such a body is spread over individual

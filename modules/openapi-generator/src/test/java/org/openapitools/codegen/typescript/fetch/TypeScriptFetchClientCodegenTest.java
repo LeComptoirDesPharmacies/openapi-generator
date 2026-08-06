@@ -123,10 +123,11 @@ public class TypeScriptFetchClientCodegenTest {
 
         Path api = Paths.get(output + "/apis/ReportApi.ts");
 
-        // Each member declares the other members' bodies as `never`. Excess property checking would catch an
-        // object literal handing an XML body to the JSON member, but not a variable; and the checks
-        // TypeScript falls back on do not cover a member that has a required parameter and an optional body,
-        // as createDraft does.
+        // Each member declares the other members' bodies as `never`, without which an XML body handed to the
+        // JSON member is silently sent as JSON. Excess property checking never fires against a union - a key
+        // present in any member counts as known - and the checks that do reject most shapes (weak type
+        // detection, a missing required property) leave out a member with a required parameter and an
+        // optional body, as createDraft has.
         TestUtils.assertFileContains(api,
                 "| { contentType?: 'application/json'; projectId: string; report?: Report; reportXml?: never; }",
                 "| { contentType: 'application/xml'; projectId: string; reportXml?: ReportXml; report?: never; }");
