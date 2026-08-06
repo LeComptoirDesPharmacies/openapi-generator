@@ -36,19 +36,25 @@ import org.openapitools.codegen.model.ModelsMap;
 import org.openapitools.codegen.model.OperationsMap;
 import org.openapitools.codegen.templating.mustache.IndentedLambda;
 import org.openapitools.codegen.utils.ModelUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.util.*;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 import static java.util.Objects.nonNull;
 import static org.openapitools.codegen.utils.CamelizeOption.LOWERCASE_FIRST_LETTER;
+import static org.openapitools.codegen.utils.OnceLogger.once;
 import static org.openapitools.codegen.utils.StringUtils.*;
 
 /**
  * <p>Mustache templates are located in {@code src/main/resources/typescript-fetch/}.
  */
 public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodegen {
+    private static final Logger LOGGER = LoggerFactory.getLogger(TypeScriptFetchClientCodegen.class);
+
     public static final String NPM_REPOSITORY = "npmRepository";
     public static final String WITH_INTERFACES = "withInterfaces";
     public static final String USE_SINGLE_REQUEST_PARAMETER = "useSingleRequestParameter";
@@ -65,6 +71,17 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
     public static final String USE_SQUARE_BRACKETS_IN_ARRAY_NAMES = "useSquareBracketsInArrayNames";
     public static final String VALIDATION_ATTRIBUTES = "validationAttributes";
     public static final String WITH_REQUEST_OPTS_IN_INTERFACE = "withRequestOptsInInterface";
+
+    // Rendering data attached to an operation merged back from its content-type variants, consumed by
+    // apisContentTypeVariants.mustache. See mergeContentTypeVariants.
+    private static final String X_CT_MERGED = "x-content-type-merged";
+    private static final String X_CT_REQUEST_VARIANTS = "x-content-type-request-variants";
+    private static final String X_CT_RESPONSE_VARIANTS = "x-content-type-response-variants";
+    private static final String X_CT_RESPONSE_DISPATCH = "x-content-type-response-dispatch";
+    private static final String X_CT_HAS_REQUEST_VARIANTS = "x-content-type-has-request-variants";
+    private static final String X_CT_HAS_RESPONSE_VARIANTS = "x-content-type-has-response-variants";
+    private static final String X_CT_DEFAULT_REQUEST = "x-content-type-default-request";
+    private static final String X_CT_DEFAULT_RESPONSE = "x-content-type-default-response";
 
     @Getter @Setter
     protected String npmRepository = null;
@@ -738,6 +755,8 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
             supportingFiles.add(new SupportingFile("models.index.mustache", modelPackage().replace('.', File.separatorChar), "index.ts"));
         }
 
+        // before everything else, so the remaining passes see the merged operations under their final names
+        this.mergeContentTypeVariants(operations);
         this.addOperationModelImportInformation(operations);
         this.escapeOperationIds(operations);
         this.updateOperationParameterForEnum(operations);
@@ -943,6 +962,170 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
                 op.operationIdSnakeCase += "_operation";
             }
         }
+    }
+
+    /**
+     * Merges the operations produced by the global {@code splitOperationsByContentType} option back into a
+     * single method per original operation.
+     * <p>
+     * The split emits one operation per (request content-type, response content-type) pair so that every
+     * variant is typed natively by the generator. Statically-typed languages need those separate methods,
+     * but TypeScript can express the whole matrix at once: the variants are collapsed into one method whose
+     * request type is a union discriminated by {@code contentType}, and whose return type is selected by
+     * overloads on {@code accept}. Each variant keeps its own natively resolved body and return types, which
+     * is exactly what the split computed.
+     * <p>
+     * Operations whose merged form cannot be expressed are left split, with a warning: form and multipart
+     * bodies are spread over individual parameters rather than a single body parameter, so they cannot be
+     * folded into a discriminated union.
+     */
+    private void mergeContentTypeVariants(OperationsMap operations) {
+        List<CodegenOperation> allOperations = operations.getOperations().getOperation();
+        if (!this.getUseSingleRequestParameter()) {
+            // the merged form carries the discriminant on the request object; with the parameters spread
+            // over the signature there is nothing to discriminate on
+            if (allOperations.stream().anyMatch(op -> op.vendorExtensions.containsKey(CodegenConstants.X_CONTENT_TYPE_VARIANT_GROUP))) {
+                once(LOGGER).warn("`{}` is off: content-type variants are generated as separate methods rather "
+                        + "than merged into one.", USE_SINGLE_REQUEST_PARAMETER);
+            }
+            return;
+        }
+
+        // LinkedHashMap: groups and their members keep the spec's content-type declaration order, which is
+        // what makes the first entry of each axis the default one.
+        Map<String, List<CodegenOperation>> groups = new LinkedHashMap<>();
+        for (CodegenOperation op : allOperations) {
+            Object group = op.vendorExtensions.get(CodegenConstants.X_CONTENT_TYPE_VARIANT_GROUP);
+            if (group != null) {
+                groups.computeIfAbsent(group + " " + op.httpMethod + " " + op.path, k -> new ArrayList<>()).add(op);
+            }
+        }
+
+        // identity-based: CodegenOperation.hashCode() walks the whole operation, and two variants of the
+        // same operation are very nearly equal
+        Set<CodegenOperation> merged = Collections.newSetFromMap(new IdentityHashMap<>());
+        Set<CodegenOperation> superseded = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (List<CodegenOperation> variants : groups.values()) {
+            if (variants.size() < 2) {
+                continue;
+            }
+            if (variants.stream().anyMatch(CodegenOperation::getHasFormParams)) {
+                once(LOGGER).warn("Operation `{}` has a form or multipart body: its content-type variants are "
+                                + "generated as separate methods rather than merged into one.",
+                        variants.get(0).vendorExtensions.get(CodegenConstants.X_CONTENT_TYPE_VARIANT_GROUP));
+                continue;
+            }
+
+            // the surviving operation is the one a caller gets without asking: rank 0 on both axes
+            CodegenOperation base = variants.stream()
+                    .filter(op -> Integer.valueOf(0).equals(op.vendorExtensions.get(CodegenConstants.X_CONTENT_TYPE_VARIANT_REQUEST_INDEX))
+                            && Integer.valueOf(0).equals(op.vendorExtensions.get(CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE_INDEX)))
+                    .findFirst()
+                    .orElse(variants.get(0));
+
+            List<Map<String, Object>> requestVariants = requestVariantsOf(variants);
+            List<Map<String, Object>> responseVariants = responseVariantsOf(variants);
+
+            renameToGroupOperationId(base);
+            base.vendorExtensions.put(X_CT_MERGED, true);
+            base.vendorExtensions.put(X_CT_REQUEST_VARIANTS, requestVariants);
+            base.vendorExtensions.put(X_CT_RESPONSE_VARIANTS, responseVariants);
+            // the same variants, but ordered for an if / else if / else chain: the default content-type is
+            // the fallback, so it comes last there rather than first
+            List<Map<String, Object>> responseDispatch = new ArrayList<>(responseVariants.subList(1, responseVariants.size()));
+            responseDispatch.add(responseVariants.get(0));
+            base.vendorExtensions.put(X_CT_RESPONSE_DISPATCH, responseDispatch);
+            base.vendorExtensions.put(X_CT_HAS_REQUEST_VARIANTS, requestVariants.size() > 1);
+            base.vendorExtensions.put(X_CT_HAS_RESPONSE_VARIANTS, responseVariants.size() > 1);
+            base.vendorExtensions.put(X_CT_DEFAULT_REQUEST, requestVariants.get(0).get("mediaType"));
+            base.vendorExtensions.put(X_CT_DEFAULT_RESPONSE, responseVariants.get(0).get("mediaType"));
+
+            merged.add(base);
+            variants.stream().filter(op -> op != base).forEach(superseded::add);
+        }
+
+        if (!merged.isEmpty()) {
+            allOperations.removeAll(superseded);
+        }
+    }
+
+    /**
+     * One entry per distinct request content-type, in declaration order, carrying the body that content-type
+     * expects as the generator resolved it. A single-element list means the request axis was not split.
+     */
+    private List<Map<String, Object>> requestVariantsOf(List<CodegenOperation> variants) {
+        return variantsByMediaType(variants, CodegenConstants.X_CONTENT_TYPE_VARIANT_REQUEST,
+                CodegenConstants.X_CONTENT_TYPE_VARIANT_REQUEST_INDEX, (entry, variant) -> {
+                    entry.put("allParams", variant.allParams);
+                    entry.put("bodyParam", variant.bodyParam);
+                });
+    }
+
+    /**
+     * One entry per distinct response content-type, in declaration order, carrying the return type the
+     * generator resolved for it and the flags {@code apisResponseVariantValue.mustache} needs to pick a
+     * deserialiser. A single-element list means the response axis was not split.
+     */
+    private List<Map<String, Object>> responseVariantsOf(List<CodegenOperation> variants) {
+        return variantsByMediaType(variants, CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE,
+                CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE_INDEX, (entry, variant) -> {
+            // absent rather than null: a null value would let Mustache fall back to the enclosing operation
+            entry.put("hasReturnType", variant.returnType != null);
+            if (variant.returnType != null) {
+                entry.put("returnType", variant.returnType);
+            }
+            if (variant.returnBaseType != null) {
+                entry.put("returnBaseType", variant.returnBaseType);
+            }
+            entry.put("isResponseFile", variant.isResponseFile);
+            entry.put("returnTypeIsPrimitive", variant.returnTypeIsPrimitive);
+            entry.put("returnSimpleType", variant.returnSimpleType);
+            entry.put("isArray", variant.isArray);
+            entry.put("isMap", variant.isMap);
+            entry.put("uniqueItems", variant.uniqueItems);
+        });
+    }
+
+    /**
+     * Groups the variants by their media-type on one axis, one entry per media-type, ordered by the rank the
+     * split recorded — the order the spec declares the content-types in. The rank is read from the variants
+     * rather than from their position in the list, which is not the split's: operations are reordered on
+     * their way to the generator.
+     * <p>
+     * Entries are plain maps rather than the variant operations: a template iterating them then still sees
+     * the <em>merged</em> operation's {@code nickname} and {@code operationIdCamelCase} through Mustache's
+     * parent-context fallback, and, more importantly, an operation must never hold itself in its own
+     * {@code vendorExtensions} — {@link CodegenOperation#hashCode()} walks that map.
+     */
+    private List<Map<String, Object>> variantsByMediaType(List<CodegenOperation> variants, String axisExtension,
+                                                          String indexExtension,
+                                                          BiConsumer<Map<String, Object>, CodegenOperation> describe) {
+        Map<Integer, Map<String, Object>> byRank = new TreeMap<>();
+        for (CodegenOperation variant : variants) {
+            // an axis left unsplit has no media-type: every variant then represents the same, single one
+            Object mediaType = variant.vendorExtensions.get(axisExtension);
+            Integer rank = (Integer) variant.vendorExtensions.get(indexExtension);
+            byRank.computeIfAbsent(rank, key -> {
+                Map<String, Object> entry = new HashMap<>();
+                entry.put("mediaType", mediaType);
+                entry.put("isDefault", key == 0);
+                describe.accept(entry, variant);
+                return entry;
+            });
+        }
+        return new ArrayList<>(byRank.values());
+    }
+
+    /** Gives a merged operation back the name of the operation it was split from. */
+    private void renameToGroupOperationId(CodegenOperation operation) {
+        String group = (String) operation.vendorExtensions.get(CodegenConstants.X_CONTENT_TYPE_VARIANT_GROUP);
+        String operationId = toOperationId(group);
+        operation.operationIdOriginal = group;
+        operation.operationId = operationId;
+        operation.nickname = operationId;
+        operation.operationIdLowerCase = operationId.toLowerCase(Locale.ROOT);
+        operation.operationIdCamelCase = camelize(operationId);
+        operation.operationIdSnakeCase = underscore(operationId);
     }
 
     private void addOperationModelImportInformation(OperationsMap operations) {

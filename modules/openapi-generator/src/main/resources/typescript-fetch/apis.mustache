@@ -22,6 +22,17 @@ import {
 
 {{#operations}}
 {{#operation}}
+{{#vendorExtensions.x-content-type-merged}}
+{{! the operation accepts several request content-types with different schemas: one union member per
+    content-type, discriminated by `contentType`, whose value selects the body's type }}
+export type {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request =
+{{#vendorExtensions.x-content-type-request-variants}}
+    | { {{#vendorExtensions.x-content-type-has-request-variants}}contentType{{#isDefault}}?{{/isDefault}}: '{{mediaType}}'; {{/vendorExtensions.x-content-type-has-request-variants}}{{#allParams}}{{paramName}}{{^required}}?{{/required}}: {{#isEnum}}{{{datatypeWithEnum}}}{{/isEnum}}{{^isEnum}}{{#hasReadOnly}}Omit<{{{dataType}}}, {{#readOnlyVars}}'{{baseName}}'{{^-last}}|{{/-last}}{{/readOnlyVars}}>{{/hasReadOnly}}{{^hasReadOnly}}{{{dataType}}}{{/hasReadOnly}}{{#isNullable}} | null{{/isNullable}}{{/isEnum}}; {{/allParams}}}
+{{/vendorExtensions.x-content-type-request-variants}}
+;
+
+{{/vendorExtensions.x-content-type-merged}}
+{{^vendorExtensions.x-content-type-merged}}
 {{#allParams.0}}
 export interface {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request {
 {{#allParams}}
@@ -30,6 +41,7 @@ export interface {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterIn
 }
 
 {{/allParams.0}}
+{{/vendorExtensions.x-content-type-merged}}
 {{/operation}}
 {{/operations}}
 {{#withInterfaces}}
@@ -115,7 +127,7 @@ export class {{classname}} extends runtime.BaseAPI {
      * @deprecated
      {{/isDeprecated}}
      */
-    async {{nickname}}RequestOpts({{#allParams.0}}requestParameters: {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request{{/allParams.0}}): Promise<runtime.RequestOpts> {
+    async {{nickname}}RequestOpts({{#vendorExtensions.x-content-type-merged}}requestParameters: {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request{{#vendorExtensions.x-content-type-has-response-variants}} & { accept?: string }{{/vendorExtensions.x-content-type-has-response-variants}}{{/vendorExtensions.x-content-type-merged}}{{^vendorExtensions.x-content-type-merged}}{{#allParams.0}}requestParameters: {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request{{/allParams.0}}{{/vendorExtensions.x-content-type-merged}}): Promise<runtime.RequestOpts> {
         {{#allParams}}
         {{#required}}
         if (requestParameters['{{paramName}}'] == null) {
@@ -162,6 +174,15 @@ export class {{classname}} extends runtime.BaseAPI {
         {{/queryParams}}
         const headerParameters: runtime.HTTPHeaders = {};
 
+        {{#vendorExtensions.x-content-type-has-request-variants}}
+        headerParameters['Content-Type'] = requestParameters.contentType ?? '{{vendorExtensions.x-content-type-default-request}}';
+
+        {{/vendorExtensions.x-content-type-has-request-variants}}
+        {{#vendorExtensions.x-content-type-has-response-variants}}
+        headerParameters['Accept'] = requestParameters.accept ?? '{{vendorExtensions.x-content-type-default-response}}';
+
+        {{/vendorExtensions.x-content-type-has-response-variants}}
+        {{^vendorExtensions.x-content-type-has-request-variants}}
         {{#bodyParam}}
         {{^consumes}}
         headerParameters['Content-Type'] = 'application/json';
@@ -172,6 +193,7 @@ export class {{classname}} extends runtime.BaseAPI {
 
         {{/consumes.0}}
         {{/bodyParam}}
+        {{/vendorExtensions.x-content-type-has-request-variants}}
         {{#headerParams}}
         {{#isArray}}
         if (requestParameters['{{paramName}}'] != null) {
@@ -319,6 +341,35 @@ export class {{classname}} extends runtime.BaseAPI {
         {{/isDateTimeType}}
         {{/pathParams}}
 
+        {{#vendorExtensions.x-content-type-has-request-variants}}
+        {{! `contentType` selects the body's type, so narrow on it before serialising }}
+        let body: any;
+        switch (requestParameters.contentType) {
+        {{#vendorExtensions.x-content-type-request-variants}}
+        {{^isDefault}}
+            case '{{mediaType}}':
+                body = {{#bodyParam}}{{>apisRequestBodyValue}}{{/bodyParam}}{{^bodyParam}}undefined{{/bodyParam}};
+                break;
+        {{/isDefault}}
+        {{/vendorExtensions.x-content-type-request-variants}}
+        {{#vendorExtensions.x-content-type-request-variants}}
+        {{#isDefault}}
+            default:
+                body = {{#bodyParam}}{{>apisRequestBodyValue}}{{/bodyParam}}{{^bodyParam}}undefined{{/bodyParam}};
+        {{/isDefault}}
+        {{/vendorExtensions.x-content-type-request-variants}}
+        }
+
+        return {
+            path: urlPath,
+            method: '{{httpMethod}}',
+            headers: headerParameters,
+            query: queryParameters,
+            body: body,
+        };
+    }
+        {{/vendorExtensions.x-content-type-has-request-variants}}
+        {{^vendorExtensions.x-content-type-has-request-variants}}
         return {
             path: urlPath,
             method: '{{httpMethod}}',
@@ -354,6 +405,7 @@ export class {{classname}} extends runtime.BaseAPI {
             {{/hasFormParams}}
         };
     }
+        {{/vendorExtensions.x-content-type-has-request-variants}}
 
     /**
      {{#notes}}
@@ -366,6 +418,37 @@ export class {{classname}} extends runtime.BaseAPI {
      * @deprecated
      {{/isDeprecated}}
      */
+    {{#vendorExtensions.x-content-type-has-response-variants}}
+    {{! one overload per response content-type: `accept` selects the return type. The implementation
+        signature unions them and is not callable from outside. }}
+    {{#vendorExtensions.x-content-type-response-variants}}
+    async {{nickname}}Raw(requestParameters: {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request & { accept{{#isDefault}}?{{/isDefault}}: '{{mediaType}}' }, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<{{#hasReturnType}}{{{returnType}}}{{/hasReturnType}}{{^hasReturnType}}void{{/hasReturnType}}>>;
+    {{/vendorExtensions.x-content-type-response-variants}}
+    async {{nickname}}Raw(requestParameters: {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request & { accept?: string }, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<{{#vendorExtensions.x-content-type-response-variants}}{{#hasReturnType}}{{{returnType}}}{{/hasReturnType}}{{^hasReturnType}}void{{/hasReturnType}}{{^-last}} | {{/-last}}{{/vendorExtensions.x-content-type-response-variants}}>> {
+        const requestOptions = await this.{{nickname}}RequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        {{! dispatch on the content-type the server actually returned, not on the requested `accept`:
+            the header is a request, and a server is free not to honour it }}
+        const responseContentType = response.headers.get('content-type') ?? '';
+    {{#vendorExtensions.x-content-type-response-dispatch}}
+    {{#-first}}
+        if (responseContentType.startsWith('{{mediaType}}')) {
+    {{/-first}}
+    {{^-first}}
+    {{^-last}}
+        } else if (responseContentType.startsWith('{{mediaType}}')) {
+    {{/-last}}
+    {{/-first}}
+    {{#-last}}
+        } else {
+    {{/-last}}
+{{>apisResponseVariantValue}}
+    {{/vendorExtensions.x-content-type-response-dispatch}}
+        }
+    }
+    {{/vendorExtensions.x-content-type-has-response-variants}}
+    {{^vendorExtensions.x-content-type-has-response-variants}}
     async {{nickname}}Raw({{#allParams.0}}requestParameters: {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request, {{/allParams.0}}initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<{{{returnType}}}{{^returnType}}void{{/returnType}}>> {
         const requestOptions = await this.{{nickname}}RequestOpts({{#allParams.0}}requestParameters{{/allParams.0}});
         const response = await this.request(requestOptions, initOverrides);
@@ -409,6 +492,7 @@ export class {{classname}} extends runtime.BaseAPI {
         return new runtime.VoidApiResponse(response);
         {{/returnType}}
     }
+    {{/vendorExtensions.x-content-type-has-response-variants}}
 
     /**
      {{#notes}}
@@ -447,6 +531,18 @@ export class {{classname}} extends runtime.BaseAPI {
     }
     {{/useSingleRequestParameter}}
     {{#useSingleRequestParameter}}
+    {{#vendorExtensions.x-content-type-has-response-variants}}
+    {{#vendorExtensions.x-content-type-response-variants}}
+    async {{nickname}}(requestParameters: {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request & { accept{{#isDefault}}?{{/isDefault}}: '{{mediaType}}' }, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{{#hasReturnType}}{{{returnType}}}{{/hasReturnType}}{{^hasReturnType}}void{{/hasReturnType}}>;
+    {{/vendorExtensions.x-content-type-response-variants}}
+    async {{nickname}}(requestParameters: {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request & { accept?: string }, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{{#vendorExtensions.x-content-type-response-variants}}{{#hasReturnType}}{{{returnType}}}{{/hasReturnType}}{{^hasReturnType}}void{{/hasReturnType}}{{^-last}} | {{/-last}}{{/vendorExtensions.x-content-type-response-variants}}> {
+        {{! `as any`: from the outside only the overloads of ...Raw are visible, and the loose `accept`
+            accepted here matches none of them }}
+        const response = await this.{{nickname}}Raw(requestParameters as any, initOverrides);
+        return await response.value();
+    }
+    {{/vendorExtensions.x-content-type-has-response-variants}}
+    {{^vendorExtensions.x-content-type-has-response-variants}}
     async {{nickname}}({{#allParams.0}}requestParameters: {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request{{^hasRequiredParams}} = {}{{/hasRequiredParams}}, {{/allParams.0}}initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{{{returnType}}}{{#returnType}}{{#isResponseOptional}} | null | undefined {{/isResponseOptional}}{{/returnType}}{{^returnType}}void{{/returnType}}> {
         {{#returnType}}
         const response = await this.{{nickname}}Raw({{#allParams.0}}requestParameters, {{/allParams.0}}initOverrides);
@@ -470,6 +566,7 @@ export class {{classname}} extends runtime.BaseAPI {
         await this.{{nickname}}Raw({{#allParams.0}}requestParameters, {{/allParams.0}}initOverrides);
         {{/returnType}}
     }
+    {{/vendorExtensions.x-content-type-has-response-variants}}
     {{/useSingleRequestParameter}}
 
     {{/operation}}

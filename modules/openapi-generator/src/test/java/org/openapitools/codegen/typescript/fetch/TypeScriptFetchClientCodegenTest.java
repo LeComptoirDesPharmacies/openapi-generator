@@ -68,6 +68,65 @@ public class TypeScriptFetchClientCodegenTest {
     }
 
     @Test
+    public void testMergesContentTypeVariantsIntoOneMethod() throws IOException {
+        File output = Files.createTempDirectory("test").toFile();
+        output.deleteOnExit();
+
+        final CodegenConfigurator configurator = new CodegenConfigurator()
+                .setGeneratorName("typescript-fetch")
+                .setInputSpec("src/test/resources/3_0/issue6708-split-by-content-type.yaml")
+                .addGlobalProperty(CodegenConstants.SPLIT_OPERATIONS_BY_CONTENT_TYPE, "true")
+                .setOutputDir(output.getAbsolutePath().replace("\\", "/"));
+
+        Generator generator = new DefaultGenerator();
+        generator.opts(configurator.toClientOptInput()).generate().forEach(File::deleteOnExit);
+
+        Path api = Paths.get(output + "/apis/ReportApi.ts");
+
+        // the split emitted four operations for POST /reports (2 request x 2 response content-types);
+        // TypeScript expresses the whole matrix at once, so a single method survives
+        TestUtils.assertFileNotContains(api, "createReportWithJsonAsJson", "createReportWithXmlAsPdf");
+
+        // request axis: a union discriminated by contentType, whose value selects the body's type. The
+        // content-type declared first is the default one, hence optional.
+        TestUtils.assertFileContains(api,
+                "| { contentType?: 'application/json'; report?: Report; }",
+                "| { contentType: 'application/xml'; reportXml?: ReportXml; }");
+
+        // response axis: one overload per content-type, `accept` selecting the return type
+        TestUtils.assertFileContains(api,
+                "async createReportRaw(requestParameters: CreateReportRequest & { accept?: 'application/json' }",
+                "async createReportRaw(requestParameters: CreateReportRequest & { accept: 'application/pdf' }",
+                "Promise<runtime.ApiResponse<Receipt | Blob>>");
+
+        // the headers default to the content-types declared first, and deserialisation dispatches on what
+        // the server actually returned rather than on the requested accept
+        TestUtils.assertFileContains(api,
+                "headerParameters['Content-Type'] = requestParameters.contentType ?? 'application/json';",
+                "headerParameters['Accept'] = requestParameters.accept ?? 'application/json';",
+                "if (responseContentType.startsWith('application/pdf')) {");
+    }
+
+    @Test
+    public void testLeavesOperationsUntouchedWithoutTheGlobalOption() throws IOException {
+        File output = Files.createTempDirectory("test").toFile();
+        output.deleteOnExit();
+
+        final CodegenConfigurator configurator = new CodegenConfigurator()
+                .setGeneratorName("typescript-fetch")
+                .setInputSpec("src/test/resources/3_0/issue6708-split-by-content-type.yaml")
+                .setOutputDir(output.getAbsolutePath().replace("\\", "/"));
+
+        Generator generator = new DefaultGenerator();
+        generator.opts(configurator.toClientOptInput()).generate().forEach(File::deleteOnExit);
+
+        // opt-in: without the global property nothing is split, so nothing is merged either
+        Path api = Paths.get(output + "/apis/ReportApi.ts");
+        TestUtils.assertFileContains(api, "export interface CreateReportRequest {");
+        TestUtils.assertFileNotContains(api, "contentType?: 'application/json'", "accept?: 'application/json'");
+    }
+
+    @Test
     public void testModelsWithoutPaths() throws IOException {
         final String specPath = "src/test/resources/3_1/reusable-components-without-paths.yaml";
 
