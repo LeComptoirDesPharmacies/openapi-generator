@@ -199,10 +199,8 @@ export class {{classname}} extends runtime.BaseAPI {
         {{/queryParams}}
         const headerParameters: runtime.HTTPHeaders = {};
 
-        {{#vendorExtensions.x-content-type-has-request-variants}}
-        headerParameters['Content-Type'] = requestParameters.contentType ?? '{{vendorExtensions.x-content-type-default-request}}';
-
-        {{/vendorExtensions.x-content-type-has-request-variants}}
+        {{! Content-Type is set per content-type in the switch below, where the body is built: a multipart
+            body must not set it at all, fetch adds it with the boundary it generates }}
         {{#vendorExtensions.x-content-type-has-response-variants}}
         headerParameters['Accept'] = requestParameters.accept ?? '{{vendorExtensions.x-content-type-default-response}}';
 
@@ -372,35 +370,17 @@ export class {{classname}} extends runtime.BaseAPI {
         switch (requestParameters.contentType) {
         {{#vendorExtensions.x-content-type-request-variants}}
         {{^isDefault}}
-            case '{{mediaType}}':
-        {{#bodyParam}}
-        {{#required}}
-                if (requestParameters['{{paramName}}'] == null) {
-                    throw new runtime.RequiredError(
-                        '{{paramName}}',
-                        'Required parameter "{{paramName}}" was null or undefined when calling {{nickname}}().'
-                    );
-                }
-        {{/required}}
-        {{/bodyParam}}
-                body = {{#bodyParam}}{{>apisRequestBodyValue}}{{/bodyParam}}{{^bodyParam}}undefined{{/bodyParam}};
+            case '{{mediaType}}': {
+{{>apisContentTypeVariantBody}}
                 break;
+            }
         {{/isDefault}}
         {{/vendorExtensions.x-content-type-request-variants}}
         {{#vendorExtensions.x-content-type-request-variants}}
         {{#isDefault}}
-            default:
-        {{#bodyParam}}
-        {{#required}}
-                if (requestParameters['{{paramName}}'] == null) {
-                    throw new runtime.RequiredError(
-                        '{{paramName}}',
-                        'Required parameter "{{paramName}}" was null or undefined when calling {{nickname}}().'
-                    );
-                }
-        {{/required}}
-        {{/bodyParam}}
-                body = {{#bodyParam}}{{>apisRequestBodyValue}}{{/bodyParam}}{{^bodyParam}}undefined{{/bodyParam}};
+            default: {
+{{>apisContentTypeVariantBody}}
+            }
         {{/isDefault}}
         {{/vendorExtensions.x-content-type-request-variants}}
         }

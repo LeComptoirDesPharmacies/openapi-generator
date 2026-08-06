@@ -1,0 +1,21 @@
+{{! Builds the body of one request content-type variant, inside its case of the content-type switch, where
+    the request union is narrowed to that variant's member. Context: a request variant entry. }}
+{{#hasFormParams}}
+                {{#lambda.indented_16}}{{>apisFormParams}}{{/lambda.indented_16}}
+                {{! a multipart body sets no Content-Type: fetch adds it with the boundary it generates }}
+                body = formParams;
+{{/hasFormParams}}
+{{^hasFormParams}}
+                headerParameters['Content-Type'] = '{{mediaType}}';
+{{#bodyParam}}
+{{#required}}
+                if (requestParameters['{{paramName}}'] == null) {
+                    throw new runtime.RequiredError(
+                        '{{paramName}}',
+                        'Required parameter "{{paramName}}" was null or undefined when calling {{nickname}}().'
+                    );
+                }
+{{/required}}
+{{/bodyParam}}
+                body = {{#bodyParam}}{{>apisRequestBodyValue}}{{/bodyParam}}{{^bodyParam}}undefined{{/bodyParam}};
+{{/hasFormParams}}

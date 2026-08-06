@@ -1015,18 +1015,6 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
             List<Map<String, Object>> requestVariants = requestVariantsOf(variants);
             List<Map<String, Object>> responseVariants = responseVariantsOf(variants);
 
-            // A form or multipart body is spread over individual parameters rather than gathered in a single
-            // body parameter, so request content-types cannot be folded into a discriminated union. This only
-            // rules out splitting the request axis: merging the response axis just adds `accept` to the
-            // request object and leaves the body alone.
-            if (requestVariants.size() > 1 && variants.stream().anyMatch(CodegenOperation::getHasFormParams)) {
-                once(LOGGER).warn("Operation `{}` accepts several request content-types, one of which is a form "
-                                + "or multipart body: its content-type variants are generated as separate "
-                                + "methods rather than merged into one.",
-                        variants.get(0).vendorExtensions.get(CodegenConstants.X_CONTENT_TYPE_VARIANT_GROUP));
-                continue;
-            }
-
             // the surviving operation is the one a caller gets without asking: rank 0 on both axes
             CodegenOperation base = variants.stream()
                     .filter(op -> Integer.valueOf(0).equals(op.vendorExtensions.get(CodegenConstants.X_CONTENT_TYPE_VARIANT_REQUEST_INDEX))
@@ -1069,6 +1057,11 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
                 CodegenConstants.X_CONTENT_TYPE_VARIANT_REQUEST_INDEX, (entry, variant) -> {
                     entry.put("allParams", variant.allParams);
                     entry.put("bodyParam", variant.bodyParam);
+                    // a form or multipart variant carries its body in individual parameters rather than in a
+                    // body parameter: the template assembles it per content-type, from these
+                    entry.put("hasFormParams", variant.getHasFormParams());
+                    entry.put("formParams", variant.formParams);
+                    entry.put("consumes", variant.consumes);
                 });
     }
 

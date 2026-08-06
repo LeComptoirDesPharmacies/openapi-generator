@@ -61,15 +61,15 @@ for a variable. What rejects most shapes is unrelated: weak type detection when 
 is optional, a missing required property otherwise. A member with a required parameter and an optional body
 has neither. The helper is emitted into `runtime.ts` only when this option is on.
 
-Two cases are left split rather than merged, with a warning. An operation accepting several request
-content-types one of which is a form or multipart body, because such a body is spread over individual
-parameters rather than gathered in one, and so cannot be folded into a discriminated union — merging the
-response axis of an operation with a form body is unaffected, since it only adds `accept` to the request
-object. And every operation when `useSingleRequestParameter` is off, since the parameters are then spread
-over the signature and there is no request object to carry the discriminant.
+A form or multipart content-type is merged like any other: its parameters stay individual rather than
+gathered in a single body, so the union member carries them as they are and the body is assembled inside
+that content-type's branch of the switch. `Content-Type` is set in each branch rather than once up front,
+because a multipart body must not set it at all — `fetch` adds it with the boundary it generates.
 
-In both cases the separate, individually typed methods the split produced are generated as they are, which
-is what a statically-typed generator emits anyway.
+One case is left split rather than merged, with a warning: every operation when `useSingleRequestParameter`
+is off, since the parameters are then spread over the signature and there is no request object to carry the
+discriminant. The separate, individually typed methods the split produced are then generated as they are,
+which is what a statically-typed generator emits anyway.
 
 
 ## Note on Global Property declaration

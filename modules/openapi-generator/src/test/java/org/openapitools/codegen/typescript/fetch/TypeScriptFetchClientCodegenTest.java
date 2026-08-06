@@ -100,10 +100,12 @@ public class TypeScriptFetchClientCodegenTest {
                 "async createReportRaw(requestParameters: CreateReportRequest & { accept: 'application/pdf' }",
                 "Promise<runtime.ApiResponse<Receipt | Blob>>");
 
-        // the headers default to the content-types declared first, and deserialisation dispatches on what
-        // the server actually returned rather than on the requested accept
+        // Content-Type is set inside the branch that builds the body, Accept defaults to the response
+        // content-type declared first, and deserialisation dispatches on what the server actually returned
+        // rather than on the requested accept
         TestUtils.assertFileContains(api,
-                "headerParameters['Content-Type'] = requestParameters.contentType ?? 'application/json';",
+                "                headerParameters['Content-Type'] = 'application/xml';",
+                "                headerParameters['Content-Type'] = 'application/json';",
                 "headerParameters['Accept'] = requestParameters.accept ?? 'application/json';",
                 "if (responseContentType.startsWith('application/pdf')) {");
     }
@@ -149,7 +151,7 @@ public class TypeScriptFetchClientCodegenTest {
     }
 
     @Test
-    public void testMergesTheResponseAxisEvenWithAFormBody() throws IOException {
+    public void testMergesFormAndMultipartVariants() throws IOException {
         File output = Files.createTempDirectory("test").toFile();
         output.deleteOnExit();
 
@@ -164,19 +166,33 @@ public class TypeScriptFetchClientCodegenTest {
 
         Path api = Paths.get(output + "/apis/FilesApi.ts");
 
-        // POST /upload has a single, multipart request content-type and two response content-types. Only the
-        // response axis is split, and merging it just adds `accept` to the request object, so the form body
-        // is no reason to leave the variants apart.
+        // POST /upload has a single, multipart request content-type and two response content-types: only the
+        // response axis is split, and merging it just adds `accept` to the request object.
         TestUtils.assertFileNotContains(api, "uploadAsJson", "uploadAsPdf");
         TestUtils.assertFileContains(api,
                 "async upload(requestParameters: UploadRequest & { accept?: 'application/json' }",
-                "async upload(requestParameters: UploadRequest & { accept: 'application/pdf' }",
-                "body: formParams,");
+                "async upload(requestParameters: UploadRequest & { accept: 'application/pdf' }");
 
         // POST /convert accepts both application/json and multipart/form-data. A form body is spread over
-        // individual parameters rather than gathered in one body parameter, so the request axis cannot be
-        // folded into a discriminated union: those variants stay separate methods.
-        TestUtils.assertFileContains(api, "async convertWithJson(", "async convertWithFormData(");
+        // individual parameters rather than gathered in one, so the union member carries them as they are
+        // and the body is assembled inside that content-type's branch.
+        TestUtils.assertFileNotContains(api, "convertWithJson", "convertWithFormData");
+        TestUtils.assertFileContains(api,
+                "| { contentType?: 'application/json'; receipt?: Receipt; }",
+                "| { contentType: 'multipart/form-data'; file?: Blob; }",
+                "            case 'multipart/form-data': {",
+                "                body = formParams;");
+
+        // Content-Type is set per branch rather than once up front: a multipart body must not set it at all,
+        // fetch adds it with the boundary it generates.
+        String content = Files.readString(api);
+        int convert = content.indexOf("async convertRequestOpts");
+        int convertEnd = content.indexOf("async convertRaw", convert);
+        String convertOpts = content.substring(convert, convertEnd);
+        assertThat(convertOpts).contains("headerParameters['Content-Type'] = 'application/json';");
+        assertThat(convertOpts)
+                .as("a multipart branch must leave Content-Type to fetch")
+                .doesNotContain("headerParameters['Content-Type'] = 'multipart/form-data';");
     }
 
     @Test
