@@ -1024,6 +1024,7 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
             merged.contentTypeMerged = true;
             merged.contentTypeRequestVariants = requestVariants;
             merged.contentTypeResponseVariants = responseVariants;
+            merged.contentTypeMergedEnumParams = enumParamsOf(variants);
             merged.hasContentTypeRequestVariants = requestVariants.size() > 1;
             merged.hasContentTypeResponseVariants = responseVariants.size() > 1;
             base.vendorExtensions.put(CodegenConstants.X_CONTENT_TYPE_DEFAULT_RESPONSE,
@@ -1145,6 +1146,24 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
         }
     }
 
+    /**
+     * Every enum parameter of every variant, deduplicated by enum type name, in variant order. The request
+     * union references them all, but only the surviving variant's parameters remain reachable through
+     * allParams — the enum declarations are emitted from this list instead. Two variants declaring the same
+     * enum name (a query parameter they share, most commonly) collapse into one declaration.
+     */
+    private static List<CodegenParameter> enumParamsOf(List<CodegenOperation> variants) {
+        Map<String, CodegenParameter> byEnumName = new LinkedHashMap<>();
+        for (CodegenOperation variant : variants) {
+            for (CodegenParameter param : variant.allParams) {
+                if (Boolean.TRUE.equals(param.isEnum) && param.enumName != null) {
+                    byEnumName.putIfAbsent(param.enumName, param);
+                }
+            }
+        }
+        return new ArrayList<>(byEnumName.values());
+    }
+
     /** The variant a caller gets without asking: rank 0 on both axes. */
     private static boolean isDefaultVariant(CodegenOperation op) {
         return Integer.valueOf(0).equals(op.vendorExtensions.get(CodegenConstants.X_CONTENT_TYPE_VARIANT_REQUEST_INDEX))
@@ -1162,13 +1181,25 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
     private void renameToGroupOperationId(CodegenOperation operation, List<CodegenOperation> variants) {
         String group = (String) operation.vendorExtensions.get(CodegenConstants.X_CONTENT_TYPE_VARIANT_GROUP);
         String operationId = toOperationId(group);
-        reprefixEnumParameters(variants, camelize(operationId));
+        String camelCase = camelize(operationId);
+        String lowerCase = operationId.toLowerCase(Locale.ROOT);
+        String snakeCase = underscore(operationId);
+        // escapeOperationIds ran on the variants' suffixed names, so it could not see the merged name:
+        // its escape is replayed here. The merged method references every variant's types, hence the
+        // union of their imports.
+        String requestName = camelCase + "Request";
+        if (variants.stream().anyMatch(variant -> variant.imports.contains(requestName))) {
+            camelCase += "Operation";
+            lowerCase += "operation";
+            snakeCase += "_operation";
+        }
+        reprefixEnumParameters(variants, camelCase);
         operation.operationIdOriginal = group;
         operation.operationId = operationId;
         operation.nickname = operationId;
-        operation.operationIdLowerCase = operationId.toLowerCase(Locale.ROOT);
-        operation.operationIdCamelCase = camelize(operationId);
-        operation.operationIdSnakeCase = underscore(operationId);
+        operation.operationIdLowerCase = lowerCase;
+        operation.operationIdCamelCase = camelCase;
+        operation.operationIdSnakeCase = snakeCase;
     }
 
     private void addOperationModelImportInformation(OperationsMap operations) {
@@ -1681,6 +1712,12 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
         public List<ContentTypeVariant> contentTypeRequestVariants, contentTypeResponseVariants;
         /** The response variants ordered for an if / else if / else chain: the default one comes last. */
         public List<ContentTypeVariant> contentTypeResponseDispatch;
+        /**
+         * Every enum parameter the merged request union references, across all the variants, deduplicated
+         * by the name of the type it declares. The enum declaration block walks this rather than allParams,
+         * which only holds the surviving variant's parameters.
+         */
+        public List<CodegenParameter> contentTypeMergedEnumParams;
 
         public ExtendedCodegenOperation(CodegenOperation o) {
             super();

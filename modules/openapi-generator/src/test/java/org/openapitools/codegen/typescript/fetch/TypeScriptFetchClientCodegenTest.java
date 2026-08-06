@@ -174,6 +174,116 @@ public class TypeScriptFetchClientCodegenTest {
     }
 
     @Test
+    public void testMergedOperationKeepsTheOptionalResponseBehaviour() throws IOException {
+        File output = Files.createTempDirectory("test").toFile();
+        output.deleteOnExit();
+
+        final CodegenConfigurator configurator = new CodegenConfigurator()
+                .setGeneratorName("typescript-fetch")
+                .setInputSpec("src/test/resources/3_0/issue6708-split-by-content-type-optional-response.yaml")
+                .addGlobalProperty(CodegenConstants.SPLIT_OPERATIONS_BY_CONTENT_TYPE, "true")
+                .setOutputDir(output.getAbsolutePath().replace("\\", "/"));
+
+        Generator generator = new DefaultGenerator();
+        generator.opts(configurator.toClientOptInput()).generate().forEach(File::deleteOnExit);
+
+        // the operation can answer 204 as well as 200: the unmerged path returns null for the bodyless
+        // status instead of parsing an empty body, and the merged one has to do the same
+        Path api = Paths.get(output + "/apis/ReportApi.ts");
+        TestUtils.assertFileContains(api,
+                "async getReport(requestParameters: GetReportRequest & { accept?: 'application/json' }, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Report | null | undefined>;",
+                "async getReport(requestParameters: GetReportRequest & { accept: 'application/pdf' }, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob | null | undefined>;",
+                "switch (response.raw.status) {",
+                "            case 204:",
+                "                return null;");
+    }
+
+    @Test
+    public void testRequiredFormParameterIsOnlyEnforcedOnItsOwnContentType() throws IOException {
+        File output = Files.createTempDirectory("test").toFile();
+        output.deleteOnExit();
+
+        final CodegenConfigurator configurator = new CodegenConfigurator()
+                .setGeneratorName("typescript-fetch")
+                .setInputSpec("src/test/resources/3_0/issue6708-split-by-content-type-required-form.yaml")
+                .addGlobalProperty(CodegenConstants.SPLIT_OPERATIONS_BY_CONTENT_TYPE, "true")
+                .setOutputDir(output.getAbsolutePath().replace("\\", "/"));
+
+        Generator generator = new DefaultGenerator();
+        generator.opts(configurator.toClientOptInput()).generate().forEach(File::deleteOnExit);
+
+        // `file` is required by the multipart variant only: guarded inside its branch of the content-type
+        // switch, not before it, where it would throw on a perfectly valid application/json call
+        Path api = Paths.get(output + "/apis/FilesApi.ts");
+        String content = Files.readString(api);
+        int requestOpts = content.indexOf("async convertRequestOpts");
+        int contentTypeSwitch = content.indexOf("switch (requestParameters.contentType)", requestOpts);
+        assertThat(content.substring(requestOpts, contentTypeSwitch))
+                .as("a form parameter must not be enforced before the content-type is known")
+                .doesNotContain("requestParameters['file'] == null");
+
+        // multipart was declared first, so its branch is the switch's default case
+        int defaultCase = content.indexOf("default: {", contentTypeSwitch);
+        TestUtils.assertFileContains(api, "Required parameter \"file\" was null or undefined");
+        assertThat(content.indexOf("requestParameters['file'] == null", defaultCase))
+                .as("the guard belongs inside the multipart branch")
+                .isGreaterThan(defaultCase);
+    }
+
+    @Test
+    public void testEnumOfADroppedVariantIsStillDeclared() throws IOException {
+        File output = Files.createTempDirectory("test").toFile();
+        output.deleteOnExit();
+
+        final CodegenConfigurator configurator = new CodegenConfigurator()
+                .setGeneratorName("typescript-fetch")
+                .setInputSpec("src/test/resources/3_0/issue6708-split-by-content-type-variant-enum.yaml")
+                .addGlobalProperty(CodegenConstants.SPLIT_OPERATIONS_BY_CONTENT_TYPE, "true")
+                .setOutputDir(output.getAbsolutePath().replace("\\", "/"));
+
+        Generator generator = new DefaultGenerator();
+        generator.opts(configurator.toClientOptInput()).generate().forEach(File::deleteOnExit);
+
+        // the `mode` enum only exists on the multipart variant, which the merge drops: the union still
+        // references its type, so the declaration has to be collected from the dropped variant
+        Path api = Paths.get(output + "/apis/FilesApi.ts");
+        TestUtils.assertFileContains(api,
+                "mode?: ConvertModeEnum;",
+                "export const ConvertModeEnum = {");
+
+        // and declared exactly once, even when several variants share the parameter
+        String content = Files.readString(api);
+        String declaration = "export const ConvertModeEnum = {";
+        assertThat(content.indexOf(declaration)).isEqualTo(content.lastIndexOf(declaration));
+    }
+
+    @Test
+    public void testMergedOperationNameIsEscapedAgainstImportedModels() throws IOException {
+        File output = Files.createTempDirectory("test").toFile();
+        output.deleteOnExit();
+
+        final CodegenConfigurator configurator = new CodegenConfigurator()
+                .setGeneratorName("typescript-fetch")
+                .setInputSpec("src/test/resources/3_0/issue6708-split-by-content-type-name-collision.yaml")
+                .addGlobalProperty(CodegenConstants.SPLIT_OPERATIONS_BY_CONTENT_TYPE, "true")
+                .setOutputDir(output.getAbsolutePath().replace("\\", "/"));
+
+        Generator generator = new DefaultGenerator();
+        generator.opts(configurator.toClientOptInput()).generate().forEach(File::deleteOnExit);
+
+        // The spec imports a model named CreateReportRequest into an API whose merged operation is
+        // createReport. escapeOperationIds ran on the variants' suffixed names and saw no clash, so the
+        // merge has to replay its escape on the merged name - the same one the unsplit path would emit.
+        Path api = Paths.get(output + "/apis/ReportApi.ts");
+        TestUtils.assertFileContains(api,
+                "export type CreateReportOperationRequest = runtime.ExclusiveUnion<",
+                "async createReport(requestParameters: CreateReportOperationRequest");
+        TestUtils.assertFileNotContains(api,
+                "export type CreateReportRequest =",
+                "export interface CreateReportRequest");
+    }
+
+    @Test
     public void testMergesFormAndMultipartVariants() throws IOException {
         File output = Files.createTempDirectory("test").toFile();
         output.deleteOnExit();

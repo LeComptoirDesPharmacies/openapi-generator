@@ -425,6 +425,46 @@ public class ModelUtilsTest {
     }
 
     @Test
+    public void testCloneOperationWithCustomSchemaType() {
+        io.swagger.v3.oas.models.Operation operation = new io.swagger.v3.oas.models.Operation()
+                .operationId("pay")
+                .requestBody(new RequestBody().content(new Content()
+                        .addMediaType("application/json", new MediaType().schema(new ObjectSchema().type("money")))));
+
+        io.swagger.v3.oas.models.Operation deepCopy = ModelUtils.cloneOperation(operation, false);
+
+        Assert.assertEquals(deepCopy, operation);
+        Assert.assertNotSame(deepCopy, operation);
+        Assert.assertEquals(deepCopy.getRequestBody().getContent().get("application/json").getSchema().getType(), "money");
+    }
+
+    @Test
+    public void testCloneRequestBodyWithCustomSchemaType() {
+        RequestBody requestBody = new RequestBody().content(new Content()
+                .addMediaType("application/json", new MediaType().schema(new ObjectSchema().type("money"))));
+
+        RequestBody deepCopy = ModelUtils.cloneRequestBody(requestBody, false);
+
+        Assert.assertEquals(deepCopy, requestBody);
+        Assert.assertNotSame(deepCopy, requestBody);
+        Assert.assertEquals(deepCopy.getContent().get("application/json").getSchema().getType(), "money");
+    }
+
+    @Test
+    public void testCloneApiResponseWithCustomSchemaType() {
+        ApiResponse response = new ApiResponse().description("ok").content(new Content()
+                .addMediaType("application/json", new MediaType().schema(
+                        new ObjectSchema().addProperty("amount", new ObjectSchema().type("money")))));
+
+        ApiResponse deepCopy = ModelUtils.cloneApiResponse(response, false);
+
+        Assert.assertEquals(deepCopy, response);
+        Assert.assertNotSame(deepCopy, response);
+        Schema property = (Schema) deepCopy.getContent().get("application/json").getSchema().getProperties().get("amount");
+        Assert.assertEquals(property.getType(), "money");
+    }
+
+    @Test
     public void testCloneComposedSchema() {
         Schema base1 = new ObjectSchema()
                 .name("Base1")

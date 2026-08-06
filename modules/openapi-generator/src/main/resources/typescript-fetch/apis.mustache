@@ -112,7 +112,7 @@ export interface {{classname}}Interface {
     {{#useSingleRequestParameter}}
     {{#hasContentTypeResponseVariants}}
     {{#contentTypeResponseVariants}}
-    {{nickname}}(requestParameters: {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request & { accept{{#isDefault}}?{{/isDefault}}: '{{mediaType}}' }, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{{#hasReturnType}}{{{returnType}}}{{/hasReturnType}}{{^hasReturnType}}void{{/hasReturnType}}>;
+    {{nickname}}(requestParameters: {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request & { accept{{#isDefault}}?{{/isDefault}}: '{{mediaType}}' }, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{{#hasReturnType}}{{{returnType}}}{{#isResponseOptional}} | null | undefined{{/isResponseOptional}}{{/hasReturnType}}{{^hasReturnType}}void{{/hasReturnType}}>;
     {{/contentTypeResponseVariants}}
     {{/hasContentTypeResponseVariants}}
     {{^hasContentTypeResponseVariants}}
@@ -149,15 +149,18 @@ export class {{classname}} extends runtime.BaseAPI {
         {{#hasContentTypeRequestVariants}}
         {{#allParams}}
         {{#required}}
-        {{! the body only exists on one member of the request union, so indexing it here would not
-            type-check - and would narrow the union for everything below. Guarded in the switch instead. }}
+        {{! the body and the form params only exist on one member of the request union: indexing them
+            here would not type-check, would narrow the union for everything below - and would demand
+            of every content-type a parameter only one of them has. Guarded in the switch instead. }}
         {{^isBodyParam}}
+        {{^isFormParam}}
         if (requestParameters['{{paramName}}'] == null) {
             throw new runtime.RequiredError(
                 '{{paramName}}',
                 'Required parameter "{{paramName}}" was null or undefined when calling {{nickname}}().'
             );
         }
+        {{/isFormParam}}
         {{/isBodyParam}}
         {{/required}}
         {{/allParams}}
@@ -510,13 +513,29 @@ export class {{classname}} extends runtime.BaseAPI {
     {{#useSingleRequestParameter}}
     {{#hasContentTypeResponseVariants}}
     {{#contentTypeResponseVariants}}
-    async {{nickname}}(requestParameters: {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request & { accept{{#isDefault}}?{{/isDefault}}: '{{mediaType}}' }, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{{#hasReturnType}}{{{returnType}}}{{/hasReturnType}}{{^hasReturnType}}void{{/hasReturnType}}>;
+    async {{nickname}}(requestParameters: {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request & { accept{{#isDefault}}?{{/isDefault}}: '{{mediaType}}' }, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{{#hasReturnType}}{{{returnType}}}{{#isResponseOptional}} | null | undefined{{/isResponseOptional}}{{/hasReturnType}}{{^hasReturnType}}void{{/hasReturnType}}>;
     {{/contentTypeResponseVariants}}
-    async {{nickname}}(requestParameters: {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request & { accept?: string }, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{{#contentTypeResponseVariants}}{{#hasReturnType}}{{{returnType}}}{{/hasReturnType}}{{^hasReturnType}}void{{/hasReturnType}}{{^-last}} | {{/-last}}{{/contentTypeResponseVariants}}> {
+    async {{nickname}}(requestParameters: {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request & { accept?: string }, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{{#contentTypeResponseVariants}}{{#hasReturnType}}{{{returnType}}}{{/hasReturnType}}{{^hasReturnType}}void{{/hasReturnType}}{{^-last}} | {{/-last}}{{/contentTypeResponseVariants}}{{#isResponseOptional}} | null | undefined{{/isResponseOptional}}> {
         {{! `as any`: from the outside only the overloads of ...Raw are visible, and the loose `accept`
             accepted here matches none of them }}
         const response = await this.{{nickname}}Raw(requestParameters as any, initOverrides);
+        {{#isResponseOptional}}
+        {{! a 2xx response with no body (a 204, typically) has nothing to deserialise: give back null,
+            the way the unmerged path does }}
+        switch (response.raw.status) {
+            {{#responses}}
+            {{#is2xx}}
+            case {{code}}:
+                return {{#dataType}}await response.value(){{/dataType}}{{^dataType}}null{{/dataType}};
+            {{/is2xx}}
+            {{/responses}}
+            default:
+                return await response.value();
+        }
+        {{/isResponseOptional}}
+        {{^isResponseOptional}}
         return await response.value();
+        {{/isResponseOptional}}
     }
     {{/hasContentTypeResponseVariants}}
     {{^hasContentTypeResponseVariants}}
@@ -553,36 +572,20 @@ export class {{classname}} extends runtime.BaseAPI {
 
 {{#operations}}
 {{#operation}}
+{{^contentTypeMerged}}
 {{#allParams}}
 {{#isEnum}}
-{{#stringEnums}}
-/**
-  * @export
-  * @enum {string}
-  */
-export enum {{operationIdCamelCase}}{{enumName}} {
-{{#allowableValues}}
-    {{#enumVars}}
-    {{{name}}} = {{{value}}}{{^-last}},{{/-last}}
-    {{/enumVars}}
-{{/allowableValues}}
-}
-{{/stringEnums}}
-{{^stringEnums}}
-/**
- * @export
- */
-export const {{operationIdCamelCase}}{{enumName}} = {
-{{#allowableValues}}
-    {{#enumVars}}
-    {{{name}}}: {{{value}}}{{^-last}},{{/-last}}
-    {{/enumVars}}
-{{/allowableValues}}
-} as const;
-export type {{operationIdCamelCase}}{{enumName}} = typeof {{operationIdCamelCase}}{{enumName}}[keyof typeof {{operationIdCamelCase}}{{enumName}}];
-{{/stringEnums}}
+{{>apisOperationEnum}}
 {{/isEnum}}
 {{/allParams}}
+{{/contentTypeMerged}}
+{{#contentTypeMerged}}
+{{! the request union references every variant's parameters, allParams only holds the surviving
+    variant's: the merge collected the enum ones across all the variants, deduplicated }}
+{{#contentTypeMergedEnumParams}}
+{{>apisOperationEnum}}
+{{/contentTypeMergedEnumParams}}
+{{/contentTypeMerged}}
 {{/operation}}
 {{/operations}}
 {{/hasEnums}}

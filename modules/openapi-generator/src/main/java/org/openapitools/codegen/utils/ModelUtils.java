@@ -56,6 +56,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static org.openapitools.codegen.CodegenConstants.X_NULLABLE;
@@ -2353,7 +2354,143 @@ public class ModelUtils {
 
     private static <T> T cloneViaMapper(T source, Class<T> type, boolean openapi31) {
         ObjectMapper mapper = openapi31 ? Json31.mapper() : Json.mapper();
-        return mapper.convertValue(source, type);
+        if (openapi31) {
+            return mapper.convertValue(source, type);
+        }
+        // Like AnnotationsUtils.clone (see cloneSchema), Json.mapper() drops on the way back any
+        // schema whose type is not a standard OpenAPI < 3.1 type. Strip those types before the
+        // round-trip and put them back, on the source and at the same positions in the clone.
+        List<Schema> strippedSchemas = new ArrayList<>();
+        List<String> strippedTypes = new ArrayList<>();
+        List<Integer> strippedPositions = new ArrayList<>();
+        int[] position = {0};
+        forEachEmbeddedSchema(source, schema -> {
+            String schemaType = schema.getType();
+            if (schemaType != null && !OPENAPI_TYPES.contains(schemaType)) {
+                strippedSchemas.add(schema);
+                strippedTypes.add(schemaType);
+                strippedPositions.add(position[0]);
+                schema.setType(null);
+            }
+            position[0]++;
+        });
+        T clone = mapper.convertValue(source, type);
+        for (int i = 0; i < strippedSchemas.size(); i++) {
+            strippedSchemas.get(i).setType(strippedTypes.get(i));
+        }
+        if (!strippedPositions.isEmpty()) {
+            // the clone has the same structure as the stripped source, so the walk visits its
+            // schemas in the same order and the recorded positions designate the same schemas
+            Iterator<Integer> nextPosition = strippedPositions.iterator();
+            Iterator<String> nextType = strippedTypes.iterator();
+            int[] target = {nextPosition.next()};
+            position[0] = 0;
+            forEachEmbeddedSchema(clone, schema -> {
+                if (target[0] == position[0] && nextType.hasNext()) {
+                    schema.setType(nextType.next());
+                    target[0] = nextPosition.hasNext() ? nextPosition.next() : -1;
+                }
+                position[0]++;
+            });
+        }
+        return clone;
+    }
+
+    /**
+     * Visits every schema embedded in {@code root} (an {@link Operation}, {@link RequestBody} or
+     * {@link ApiResponse}) and their sub-schemas, depth-first in a deterministic order. {@code $ref}s
+     * are not followed: the object is treated as self-contained, the way the mapper serializes it.
+     */
+    private static void forEachEmbeddedSchema(Object root, Consumer<Schema> visitor) {
+        if (root instanceof Operation) {
+            Operation operation = (Operation) root;
+            if (operation.getParameters() != null) {
+                for (Parameter parameter : operation.getParameters()) {
+                    visitEmbeddedSchema(parameter == null ? null : parameter.getSchema(), visitor);
+                    visitEmbeddedContent(parameter == null ? null : parameter.getContent(), visitor);
+                }
+            }
+            if (operation.getRequestBody() != null) {
+                forEachEmbeddedSchema(operation.getRequestBody(), visitor);
+            }
+            if (operation.getResponses() != null) {
+                for (ApiResponse response : operation.getResponses().values()) {
+                    forEachEmbeddedSchema(response, visitor);
+                }
+            }
+            if (operation.getCallbacks() != null) {
+                for (Callback callback : operation.getCallbacks().values()) {
+                    if (callback == null) {
+                        continue;
+                    }
+                    for (PathItem pathItem : callback.values()) {
+                        for (Operation callbackOperation : pathItem.readOperations()) {
+                            forEachEmbeddedSchema(callbackOperation, visitor);
+                        }
+                    }
+                }
+            }
+        } else if (root instanceof RequestBody) {
+            visitEmbeddedContent(((RequestBody) root).getContent(), visitor);
+        } else if (root instanceof ApiResponse) {
+            ApiResponse response = (ApiResponse) root;
+            visitEmbeddedContent(response.getContent(), visitor);
+            if (response.getHeaders() != null) {
+                for (Header header : response.getHeaders().values()) {
+                    visitEmbeddedSchema(header == null ? null : header.getSchema(), visitor);
+                    visitEmbeddedContent(header == null ? null : header.getContent(), visitor);
+                }
+            }
+        }
+    }
+
+    private static void visitEmbeddedContent(Content content, Consumer<Schema> visitor) {
+        if (content == null) {
+            return;
+        }
+        for (MediaType mediaType : content.values()) {
+            if (mediaType == null) {
+                continue;
+            }
+            visitEmbeddedSchema(mediaType.getSchema(), visitor);
+            if (mediaType.getEncoding() != null) {
+                for (Encoding encoding : mediaType.getEncoding().values()) {
+                    if (encoding == null || encoding.getHeaders() == null) {
+                        continue;
+                    }
+                    for (Header header : encoding.getHeaders().values()) {
+                        visitEmbeddedSchema(header == null ? null : header.getSchema(), visitor);
+                        visitEmbeddedContent(header == null ? null : header.getContent(), visitor);
+                    }
+                }
+            }
+        }
+    }
+
+    private static void visitEmbeddedSchema(Schema schema, Consumer<Schema> visitor) {
+        if (schema == null) {
+            return;
+        }
+        visitor.accept(schema);
+        for (List<Schema> composed : Arrays.asList(schema.getAllOf(), schema.getAnyOf(), schema.getOneOf())) {
+            if (composed != null) {
+                for (Schema subSchema : composed) {
+                    visitEmbeddedSchema(subSchema, visitor);
+                }
+            }
+        }
+        visitEmbeddedSchema(schema.getItems(), visitor);
+        visitEmbeddedSchema(schema.getNot(), visitor);
+        if (schema.getAdditionalProperties() instanceof Schema) {
+            visitEmbeddedSchema((Schema) schema.getAdditionalProperties(), visitor);
+        }
+        if (schema.getProperties() != null) {
+            for (Object property : schema.getProperties().values()) {
+                if (property instanceof Schema) {
+                    visitEmbeddedSchema((Schema) property, visitor);
+                }
+            }
+        }
     }
 
     /**
