@@ -66,7 +66,7 @@ export interface {{classname}}Interface {
      * @throws {RequiredError}
      * @memberof {{classname}}Interface
      */
-    {{nickname}}RequestOpts({{#allParams.0}}requestParameters: {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request{{/allParams.0}}): Promise<runtime.RequestOpts>;
+    {{nickname}}RequestOpts({{#vendorExtensions.x-content-type-merged}}requestParameters: {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request{{#vendorExtensions.x-content-type-has-response-variants}} & { accept?: string }{{/vendorExtensions.x-content-type-has-response-variants}}{{/vendorExtensions.x-content-type-merged}}{{^vendorExtensions.x-content-type-merged}}{{#allParams.0}}requestParameters: {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request{{/allParams.0}}{{/vendorExtensions.x-content-type-merged}}): Promise<runtime.RequestOpts>;
 
     {{/withRequestOptsInInterface}}
     /**
@@ -84,7 +84,14 @@ export interface {{classname}}Interface {
      * @throws {RequiredError}
      * @memberof {{classname}}Interface
      */
+    {{#vendorExtensions.x-content-type-has-response-variants}}
+    {{#vendorExtensions.x-content-type-response-variants}}
+    {{nickname}}Raw(requestParameters: {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request & { accept{{#isDefault}}?{{/isDefault}}: '{{mediaType}}' }, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<{{#hasReturnType}}{{{returnType}}}{{/hasReturnType}}{{^hasReturnType}}void{{/hasReturnType}}>>;
+    {{/vendorExtensions.x-content-type-response-variants}}
+    {{/vendorExtensions.x-content-type-has-response-variants}}
+    {{^vendorExtensions.x-content-type-has-response-variants}}
     {{nickname}}Raw({{#allParams.0}}requestParameters: {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request, {{/allParams.0}}initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<{{{returnType}}}{{^returnType}}void{{/returnType}}>>;
+    {{/vendorExtensions.x-content-type-has-response-variants}}
 
     /**
      {{#notes}}
@@ -101,7 +108,14 @@ export interface {{classname}}Interface {
     {{nickname}}({{#allParams}}{{paramName}}{{^required}}?{{/required}}: {{#isEnum}}{{{datatypeWithEnum}}}{{/isEnum}}{{^isEnum}}{{{dataType}}}{{#isNullable}} | null{{/isNullable}}{{/isEnum}}, {{/allParams}}initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{{{returnType}}}{{#returnType}}{{#isResponseOptional}} | null | undefined {{/isResponseOptional}}{{/returnType}}{{^returnType}}void{{/returnType}}>;
     {{/useSingleRequestParameter}}
     {{#useSingleRequestParameter}}
+    {{#vendorExtensions.x-content-type-has-response-variants}}
+    {{#vendorExtensions.x-content-type-response-variants}}
+    {{nickname}}(requestParameters: {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request & { accept{{#isDefault}}?{{/isDefault}}: '{{mediaType}}' }, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{{#hasReturnType}}{{{returnType}}}{{/hasReturnType}}{{^hasReturnType}}void{{/hasReturnType}}>;
+    {{/vendorExtensions.x-content-type-response-variants}}
+    {{/vendorExtensions.x-content-type-has-response-variants}}
+    {{^vendorExtensions.x-content-type-has-response-variants}}
     {{nickname}}({{#allParams.0}}requestParameters: {{#prefixParameterInterfaces}}{{classname}}{{/prefixParameterInterfaces}}{{operationIdCamelCase}}Request, {{/allParams.0}}initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{{{returnType}}}{{#returnType}}{{#isResponseOptional}} | null | undefined {{/isResponseOptional}}{{/returnType}}{{^returnType}}void{{/returnType}}>;
+    {{/vendorExtensions.x-content-type-has-response-variants}}
     {{/useSingleRequestParameter}}
 
 {{/operation}}
