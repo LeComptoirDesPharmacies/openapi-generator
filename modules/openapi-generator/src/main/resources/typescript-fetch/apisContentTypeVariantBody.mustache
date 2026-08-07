@@ -13,7 +13,7 @@
                 }
 {{/required}}
 {{/formParams}}
-                {{#lambda.indented_16_skip_blank}}{{>apisFormParams}}{{/lambda.indented_16_skip_blank}}
+{{#lambda.indented_8_skip_blank}}{{>apisFormParams}}{{/lambda.indented_8_skip_blank}}
                 {{! a multipart body sets no Content-Type: fetch adds it with the boundary it generates }}
                 body = formParams;
 {{/hasFormParams}}

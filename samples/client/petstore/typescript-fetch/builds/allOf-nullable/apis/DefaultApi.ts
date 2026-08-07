@@ -38,6 +38,7 @@ export class DefaultApi extends runtime.BaseAPI {
                 'Required parameter "personId" was null or undefined when calling list().'
             );
         }
+
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};

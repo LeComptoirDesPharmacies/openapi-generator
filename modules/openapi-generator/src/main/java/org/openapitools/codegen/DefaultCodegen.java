@@ -1088,14 +1088,14 @@ public class DefaultCodegen implements CodegenConfig {
             return Collections.singletonList(operation);
         }
         RequestBody requestBody = ModelUtils.getReferencedRequestBody(openAPI, operation.getRequestBody());
-        List<String> requestAxis = axisOf(requestBody == null ? null : requestBody.getContent());
+        List<Axis> requestAxis = axisOf(requestBody == null ? null : requestBody.getContent());
 
         // Only the response the generator derives the return type from (the method response) is split, so the
         // variants' return types and Accept headers stay consistent (see findMethodResponse).
         String methodResponseCode = operation.getResponses() == null ? null : findMethodResponseCode(operation.getResponses());
         ApiResponse methodResponse = methodResponseCode == null ? null
                 : ModelUtils.getReferencedApiResponse(openAPI, operation.getResponses().get(methodResponseCode));
-        List<String> responseAxis = axisOf(methodResponse == null ? null : methodResponse.getContent());
+        List<Axis> responseAxis = axisOf(methodResponse == null ? null : methodResponse.getContent());
 
         if (requestAxis.size() == 1 && responseAxis.size() == 1) {
             return Collections.singletonList(operation); // single content-type on both axes: nothing to divide
@@ -1104,19 +1104,12 @@ public class DefaultCodegen implements CodegenConfig {
         // Both axes are in declaration order, so rank 0 is the default content-type, consistently with the
         // rest of the generator: addConsumesInfo keeps that order and templates read consumes.0.
         String baseId = getOrGenerateOperationId(operation, path, httpMethod);
-        Map<String, String> requestTokens = axisTokens(requestAxis);
-        Map<String, String> responseTokens = axisTokens(responseAxis);
         List<Operation> variants = new ArrayList<>(requestAxis.size() * responseAxis.size());
-        for (String requestMediaType : requestAxis) {
-            for (String responseMediaType : responseAxis) {
-                Operation variant = buildOperationVariant(openAPI, operation, baseId, requestMediaType,
-                        requestTokens.get(requestMediaType), responseMediaType,
-                        responseTokens.get(responseMediaType), methodResponseCode, methodResponse);
-                // the rank travels with the variant: the operations are reordered before they reach a
-                // generator, so their position in the list is no longer the order declared in the spec
-                tagContentTypeVariant(variant, baseId,
-                        requestMediaType, requestAxis.indexOf(requestMediaType),
-                        responseMediaType, responseAxis.indexOf(responseMediaType));
+        for (Axis request : requestAxis) {
+            for (Axis response : responseAxis) {
+                Operation variant = buildOperationVariant(openAPI, operation, baseId, request, response,
+                        methodResponseCode, methodResponse);
+                tagContentTypeVariant(variant, baseId, request, response);
                 variants.add(variant);
             }
         }
@@ -1124,15 +1117,33 @@ public class DefaultCodegen implements CodegenConfig {
     }
 
     /**
+     * One position on a content-type axis. {@link Axis#NOT_SPLIT} is the single position of an axis that
+     * stays as it is; the others carry the media-type the variant is narrowed to, the token its operationId
+     * is built from, and the rank the spec declares that media-type at.
+     */
+    private static final class Axis {
+        private static final Axis NOT_SPLIT = new Axis(null, null, 0);
+
+        private final String mediaType;
+        private final String token;
+        private final int rank;
+
+        private Axis(String mediaType, String token, int rank) {
+            this.mediaType = mediaType;
+            this.token = token;
+            this.rank = rank;
+        }
+    }
+
+    /**
      * The media-types of {@code content} deduplicated by resolved schema (two media-types sharing a schema
      * collapse into the first one declared), kept in declaration order: that is the order the rest of the
-     * generator already treats as authoritative, so the first entry is the content-type a caller gets by
-     * default. Returns a singleton {@code [null]} when fewer than two distinct schemas remain, meaning
-     * "do not split this axis".
+     * generator already treats as authoritative, so rank 0 is the content-type a caller gets by default.
+     * Returns a singleton {@link Axis#NOT_SPLIT} when fewer than two distinct schemas remain.
      */
-    private List<String> axisOf(Content content) {
+    private List<Axis> axisOf(Content content) {
         if (content == null || content.size() < 2) {
-            return Collections.singletonList(null);
+            return Collections.singletonList(Axis.NOT_SPLIT);
         }
         List<String> mediaTypes = new ArrayList<>();
         Set<String> seenSchemas = new HashSet<>();
@@ -1141,7 +1152,20 @@ public class DefaultCodegen implements CodegenConfig {
                 mediaTypes.add(entry.getKey());
             }
         }
-        return mediaTypes.size() < 2 ? Collections.singletonList(null) : mediaTypes;
+        if (mediaTypes.size() < 2) {
+            return Collections.singletonList(Axis.NOT_SPLIT);
+        }
+        // the subtype alone identifies most media-types, but not all: text/csv and application/csv would
+        // both be Csv and give two variants the same operationId, so those fall back to the whole type
+        Map<String, Long> bySubtype = mediaTypes.stream()
+                .collect(Collectors.groupingBy(DefaultCodegen::subtypeToken, Collectors.counting()));
+        List<Axis> axis = new ArrayList<>(mediaTypes.size());
+        for (int rank = 0; rank < mediaTypes.size(); rank++) {
+            String mediaType = mediaTypes.get(rank);
+            String subtype = subtypeToken(mediaType);
+            axis.add(new Axis(mediaType, bySubtype.get(subtype) > 1 ? sanitizeToken(mediaType) : subtype, rank));
+        }
+        return axis;
     }
 
     /**
@@ -1150,18 +1174,19 @@ public class DefaultCodegen implements CodegenConfig {
      * media-type they were narrowed to on each axis (absent when that axis was not split) and its rank in
      * that axis. See {@link CodegenConstants#X_CONTENT_TYPE_VARIANT_REQUEST_INDEX}.
      */
-    private static void tagContentTypeVariant(Operation variant, String group, String requestMediaType,
-                                              int requestIndex, String responseMediaType, int responseIndex) {
+    private static void tagContentTypeVariant(Operation variant, String group, Axis request, Axis response) {
         Map<String, Object> extensions = variant.getExtensions();
         extensions.put(CodegenConstants.X_CONTENT_TYPE_VARIANT_GROUP, group);
-        if (requestMediaType != null) {
-            extensions.put(CodegenConstants.X_CONTENT_TYPE_VARIANT_REQUEST, requestMediaType);
+        if (request.mediaType != null) {
+            extensions.put(CodegenConstants.X_CONTENT_TYPE_VARIANT_REQUEST, request.mediaType);
         }
-        if (responseMediaType != null) {
-            extensions.put(CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE, responseMediaType);
+        if (response.mediaType != null) {
+            extensions.put(CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE, response.mediaType);
         }
-        extensions.put(CodegenConstants.X_CONTENT_TYPE_VARIANT_REQUEST_INDEX, requestIndex);
-        extensions.put(CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE_INDEX, responseIndex);
+        // the rank travels with the variant: the operations are reordered before they reach a generator,
+        // so their position in the list is no longer the order declared in the spec
+        extensions.put(CodegenConstants.X_CONTENT_TYPE_VARIANT_REQUEST_INDEX, request.rank);
+        extensions.put(CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE_INDEX, response.rank);
     }
 
     /**
@@ -1169,27 +1194,26 @@ public class DefaultCodegen implements CodegenConfig {
      * media-type leaves that axis untouched), with a typed, collision-free operationId.
      */
     private Operation buildOperationVariant(OpenAPI openAPI, Operation original, String baseId,
-                                            String requestMediaType, String requestToken,
-                                            String responseMediaType, String responseToken,
+                                            Axis request, Axis response,
                                             String targetResponseCode, ApiResponse targetResponse) {
         Operation variant = shallowCopyOperation(original);
 
         // typed, collision-free operationId: request -> "With<Subtype>", response -> "As<Subtype>"
         StringBuilder operationId = new StringBuilder(baseId);
-        if (requestMediaType != null) {
-            operationId.append("With").append(camelize(requestToken));
+        if (request.mediaType != null) {
+            operationId.append("With").append(camelize(request.token));
         }
-        if (responseMediaType != null) {
-            operationId.append("As").append(camelize(responseToken));
+        if (response.mediaType != null) {
+            operationId.append("As").append(camelize(response.token));
         }
         variant.setOperationId(operationId.toString());
 
-        if (requestMediaType != null) {
+        if (request.mediaType != null) {
             RequestBody requestBody = ModelUtils.getReferencedRequestBody(openAPI, original.getRequestBody());
-            variant.setRequestBody(narrowRequestBody(requestBody, requestMediaType));
+            variant.setRequestBody(narrowRequestBody(requestBody, request.mediaType));
         }
-        if (responseMediaType != null) {
-            variant.setResponses(narrowResponses(original.getResponses(), targetResponseCode, targetResponse, responseMediaType));
+        if (response.mediaType != null) {
+            variant.setResponses(narrowResponses(original.getResponses(), targetResponseCode, targetResponse, response.mediaType));
         }
         return variant;
     }
@@ -1281,26 +1305,6 @@ public class DefaultCodegen implements CodegenConfig {
             key.append("|addProps=").append(schemaKey((Schema) schema.getAdditionalProperties()));
         }
         return key.toString();
-    }
-
-    /**
-     * A token per media-type of an axis, unique within it: the subtype alone where it identifies the
-     * media-type, the whole type otherwise — {@code text/csv} and {@code application/csv} would both be
-     * {@code Csv} and give two variants the same operationId.
-     */
-    private static Map<String, String> axisTokens(List<String> axis) {
-        Map<String, Long> bySubtype = axis.stream().filter(Objects::nonNull)
-                .collect(Collectors.groupingBy(DefaultCodegen::subtypeToken, Collectors.counting()));
-        Map<String, String> tokens = new HashMap<>();
-        for (String mediaType : axis) {
-            if (mediaType == null) {
-                continue;
-            }
-            String subtype = subtypeToken(mediaType);
-            tokens.put(mediaType, bySubtype.get(subtype) > 1
-                    ? sanitizeToken(mediaType) : subtype);
-        }
-        return tokens;
     }
 
     /** Whole media-type reduced to an identifier, e.g. {@code text_csv} from {@code text/csv}. */

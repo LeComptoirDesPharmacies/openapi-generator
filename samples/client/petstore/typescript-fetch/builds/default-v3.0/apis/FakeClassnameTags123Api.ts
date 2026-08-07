@@ -38,6 +38,7 @@ export class FakeClassnameTags123Api extends runtime.BaseAPI {
                 'Required parameter "client" was null or undefined when calling testClassname().'
             );
         }
+
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};

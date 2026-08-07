@@ -52,6 +52,7 @@ export class PetPartApi extends runtime.BaseAPI {
                 'Required parameter "fakePetPartId" was null or undefined when calling getFakePetPartType().'
             );
         }
+
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -96,24 +97,28 @@ export class PetPartApi extends runtime.BaseAPI {
                 'Required parameter "fakePetPartId" was null or undefined when calling getMatchingParts().'
             );
         }
+
         if (requestParameters['_long'] == null) {
             throw new runtime.RequiredError(
                 '_long',
                 'Required parameter "_long" was null or undefined when calling getMatchingParts().'
             );
         }
+
         if (requestParameters['smooth'] == null) {
             throw new runtime.RequiredError(
                 'smooth',
                 'Required parameter "smooth" was null or undefined when calling getMatchingParts().'
             );
         }
+
         if (requestParameters['_short'] == null) {
             throw new runtime.RequiredError(
                 '_short',
                 'Required parameter "_short" was null or undefined when calling getMatchingParts().'
             );
         }
+
         const queryParameters: any = {};
 
         if (requestParameters['_long'] != null) {

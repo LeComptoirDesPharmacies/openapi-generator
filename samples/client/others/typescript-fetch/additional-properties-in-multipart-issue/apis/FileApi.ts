@@ -41,18 +41,21 @@ export class FileApi extends runtime.BaseAPI {
                 'Required parameter "documentBytes" was null or undefined when calling createFile().'
             );
         }
+
         if (requestParameters['documentType'] == null) {
             throw new runtime.RequiredError(
                 'documentType',
                 'Required parameter "documentType" was null or undefined when calling createFile().'
             );
         }
+
         if (requestParameters['properties'] == null) {
             throw new runtime.RequiredError(
                 'properties',
                 'Required parameter "properties" was null or undefined when calling createFile().'
             );
         }
+
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -83,12 +86,11 @@ export class FileApi extends runtime.BaseAPI {
 
         if (requestParameters['structured'] != null) {
             formParams.append('structured', new Blob([JSON.stringify(StructuredTypeToJSON(requestParameters['structured']))], { type: "application/json", }));
-            }
+                    }
 
         if (requestParameters['properties'] != null) {
             formParams.append('properties', new Blob([JSON.stringify(requestParameters['properties'])], { type: "application/json", }));
-            }
-
+                    }
 
 
         let urlPath = `/api/v1/file`;

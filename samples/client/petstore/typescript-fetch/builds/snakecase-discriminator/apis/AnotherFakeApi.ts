@@ -38,6 +38,7 @@ export class AnotherFakeApi extends runtime.BaseAPI {
                 'Required parameter "client" was null or undefined when calling _123testSpecialTags().'
             );
         }
+
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};

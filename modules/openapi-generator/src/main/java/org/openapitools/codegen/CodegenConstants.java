@@ -151,29 +151,20 @@ public class CodegenConstants {
     public static final String PREPEND_FORM_OR_BODY_PARAMETERS_DESC = "Add form or body parameters to the beginning of the parameter list.";
 
     public static final String SPLIT_OPERATIONS_BY_CONTENT_TYPE = "splitOperationsByContentType";
-    public static final String SPLIT_OPERATIONS_BY_CONTENT_TYPE_DESC = "Generate one operation per request/response content-type when an operation exposes several content-types with different schemas.";
 
     /**
      * Extensions set on every operation produced by {@code splitOperationsByContentType}, describing where
      * the variant sits in the content-type matrix so that a generator can merge the variants back into a
      * single construct instead of emitting one method per combination.
+     * <p>
+     * The {@code *-index} ones carry the 0-based rank of the variant's media-type in its axis, in the order
+     * the spec declares them, so a consumer never has to rely on the order operations happen to reach it in:
+     * rank 0 is that axis's default content-type, and the variant ranked 0 on both axes is the one a caller
+     * gets without asking. An axis that was not split has no media-type and ranks 0.
      */
     public static final String X_CONTENT_TYPE_VARIANT_GROUP = "x-content-type-variant-group";
     public static final String X_CONTENT_TYPE_VARIANT_REQUEST = "x-content-type-variant-request";
     public static final String X_CONTENT_TYPE_VARIANT_RESPONSE = "x-content-type-variant-response";
-    /**
-     * 0-based rank of the variant's media-type in its axis, in the order the spec declares them, so a
-     * consumer never has to rely on the order operations happen to reach it in. Rank 0 is the default
-     * content-type of that axis; the variant ranked 0 on both axes is the one a caller gets without asking.
-     * An axis that was not split has no media-type and ranks 0.
-     */
-    /**
-     * The content-type an operation answers with by default: the first one declared on the response the
-     * return type is derived from. Set on every operation while the option is on, divided or not, so that a
-     * generator can always send a matching Accept header.
-     */
-    public static final String X_CONTENT_TYPE_DEFAULT_RESPONSE = "x-content-type-default-response";
-
     public static final String X_CONTENT_TYPE_VARIANT_REQUEST_INDEX = "x-content-type-variant-request-index";
     public static final String X_CONTENT_TYPE_VARIANT_RESPONSE_INDEX = "x-content-type-variant-response-index";
 

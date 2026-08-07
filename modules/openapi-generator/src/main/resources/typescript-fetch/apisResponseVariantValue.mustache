@@ -2,7 +2,7 @@
     friends are the ones the generator resolved natively for that content-type. `as any` is unavoidable: the
     implementation signature returns the union of every variant's type, and TypeScript cannot prove which
     branch the runtime content-type took. }}
-{{#hasReturnType}}
+{{#returnType}}
 {{#isResponseFile}}
             return new runtime.BlobApiResponse(response) as any;
 {{/isResponseFile}}
@@ -36,7 +36,7 @@
 {{/isArray}}
 {{/returnTypeIsPrimitive}}
 {{/isResponseFile}}
-{{/hasReturnType}}
-{{^hasReturnType}}
+{{/returnType}}
+{{^returnType}}
             return new runtime.VoidApiResponse(response) as any;
-{{/hasReturnType}}
+{{/returnType}}

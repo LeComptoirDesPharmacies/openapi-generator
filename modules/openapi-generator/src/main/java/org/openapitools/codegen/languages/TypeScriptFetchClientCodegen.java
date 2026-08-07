@@ -72,9 +72,6 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
     public static final String VALIDATION_ATTRIBUTES = "validationAttributes";
     public static final String WITH_REQUEST_OPTS_IN_INTERFACE = "withRequestOptsInInterface";
 
-    // Rendering data attached to an operation merged back from its content-type variants, consumed by
-    // apisContentTypeVariants.mustache. See mergeContentTypeVariants.
-
     @Getter @Setter
     protected String npmRepository = null;
     @Getter @Setter
@@ -388,7 +385,6 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
         // the shared indented_N lambdas indent blank lines too, leaving trailing whitespace; these skip
         // them, so a flush-left partial can be shared between call sites at different depths
         lambdas.put("indented_8_skip_blank", new IndentedLambda(8, " ", false, true));
-        lambdas.put("indented_16_skip_blank", new IndentedLambda(16, " ", false, true));
         return lambdas;
     }
 
@@ -956,14 +952,17 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
     private void escapeOperationIds(OperationsMap operations) {
         for (CodegenOperation _op : operations.getOperations().getOperation()) {
             ExtendedCodegenOperation op = (ExtendedCodegenOperation) _op;
-            String param = op.operationIdCamelCase + "Request";
-            if (op.imports.contains(param)) {
+            if (op.imports.contains(op.operationIdCamelCase + "Request")) {
                 // we import a model with the same name as the generated operation, escape it
-                op.operationIdCamelCase += "Operation";
-                op.operationIdLowerCase += "operation";
-                op.operationIdSnakeCase += "_operation";
+                escapeOperationId(op);
             }
         }
+    }
+
+    private static void escapeOperationId(CodegenOperation op) {
+        op.operationIdCamelCase += "Operation";
+        op.operationIdLowerCase += "operation";
+        op.operationIdSnakeCase += "_operation";
     }
 
     /**
@@ -977,11 +976,17 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
      * overloads on {@code accept}. Each variant keeps its own natively resolved body and return types, which
      * is exactly what the split computed.
      * <p>
-     * Operations whose merged form cannot be expressed are left split, with a warning: form and multipart
-     * bodies are spread over individual parameters rather than a single body parameter, so they cannot be
-     * folded into a discriminated union.
+     * The one shape the merged form cannot express is {@code useSingleRequestParameter} off: with the
+     * parameters spread over the signature there is no request object to carry the discriminant. Those
+     * operations are left split, with a warning.
      */
+    /** Media-type the merged operation sends as Accept when the caller does not pick one. */
+    private static final String X_CONTENT_TYPE_DEFAULT_RESPONSE = "x-content-type-default-response";
+
     private void mergeContentTypeVariants(OperationsMap operations) {
+        if (!splitOperationsByContentType) {
+            return;
+        }
         List<CodegenOperation> allOperations = operations.getOperations().getOperation();
         if (!this.getUseSingleRequestParameter()) {
             // the merged form carries the discriminant on the request object; with the parameters spread
@@ -993,8 +998,8 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
             return;
         }
 
-        // LinkedHashMap: groups and their members keep the spec's content-type declaration order, which is
-        // what makes the first entry of each axis the default one.
+        // LinkedHashMap only to keep the groups themselves in a stable order; within a group the axis order
+        // comes from the rank each variant carries, not from its position here - see variantsByRank.
         Map<String, List<CodegenOperation>> groups = new LinkedHashMap<>();
         for (CodegenOperation op : allOperations) {
             Object group = op.vendorExtensions.get(CodegenConstants.X_CONTENT_TYPE_VARIANT_GROUP);
@@ -1027,7 +1032,7 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
             merged.contentTypeMergedEnumParams = enumParamsOf(variants);
             merged.hasContentTypeRequestVariants = requestVariants.size() > 1;
             merged.hasContentTypeResponseVariants = responseVariants.size() > 1;
-            base.vendorExtensions.put(CodegenConstants.X_CONTENT_TYPE_DEFAULT_RESPONSE,
+            base.vendorExtensions.put(X_CONTENT_TYPE_DEFAULT_RESPONSE,
                     responseVariants.get(0).mediaType);
             if (responseVariants.size() > 1) {
                 // the same variants, but ordered for an if / else if / else chain: the default content-type
@@ -1070,7 +1075,6 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
     private List<ContentTypeVariant> responseVariantsOf(List<CodegenOperation> variants) {
         return variantsByRank(variants, CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE,
                 CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE_INDEX, (entry, variant) -> {
-                    entry.hasReturnType = variant.returnType != null;
                     entry.returnType = variant.returnType;
                     entry.returnBaseType = variant.returnBaseType;
                     entry.isResponseFile = variant.isResponseFile;
@@ -1121,8 +1125,7 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
         public List<Map<String, String>> consumes;
 
         // response axis
-        public boolean hasReturnType, isResponseFile, returnTypeIsPrimitive, returnSimpleType, isArray, isMap,
-                uniqueItems;
+        public boolean isResponseFile, returnTypeIsPrimitive, returnSimpleType, isArray, isMap, uniqueItems;
         public String returnType, returnBaseType;
     }
 
@@ -1182,24 +1185,25 @@ public class TypeScriptFetchClientCodegen extends AbstractTypeScriptClientCodege
         String group = (String) operation.vendorExtensions.get(CodegenConstants.X_CONTENT_TYPE_VARIANT_GROUP);
         String operationId = toOperationId(group);
         String camelCase = camelize(operationId);
-        String lowerCase = operationId.toLowerCase(Locale.ROOT);
-        String snakeCase = underscore(operationId);
         // escapeOperationIds ran on the variants' suffixed names, so it could not see the merged name:
         // its escape is replayed here. The merged method references every variant's types, hence the
         // union of their imports.
         String requestName = camelCase + "Request";
-        if (variants.stream().anyMatch(variant -> variant.imports.contains(requestName))) {
-            camelCase += "Operation";
-            lowerCase += "operation";
-            snakeCase += "_operation";
-        }
-        reprefixEnumParameters(variants, camelCase);
+        boolean collides = variants.stream().anyMatch(variant -> variant.imports.contains(requestName));
+
+        // before the rename: reprefixEnumParameters matches on each variant's current name, and the merged
+        // operation is one of the variants
+        reprefixEnumParameters(variants, collides ? camelCase + "Operation" : camelCase);
+
         operation.operationIdOriginal = group;
         operation.operationId = operationId;
         operation.nickname = operationId;
-        operation.operationIdLowerCase = lowerCase;
         operation.operationIdCamelCase = camelCase;
-        operation.operationIdSnakeCase = snakeCase;
+        operation.operationIdLowerCase = operationId.toLowerCase(Locale.ROOT);
+        operation.operationIdSnakeCase = underscore(operationId);
+        if (collides) {
+            escapeOperationId(operation);
+        }
     }
 
     private void addOperationModelImportInformation(OperationsMap operations) {
