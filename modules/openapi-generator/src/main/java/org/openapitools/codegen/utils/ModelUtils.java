@@ -2374,9 +2374,15 @@ public class ModelUtils {
             }
             position[0]++;
         });
-        T clone = mapper.convertValue(source, type);
-        for (int i = 0; i < strippedSchemas.size(); i++) {
-            strippedSchemas.get(i).setType(strippedTypes.get(i));
+        T clone;
+        try {
+            clone = mapper.convertValue(source, type);
+        } finally {
+            // the source is the live document: leaving it stripped would silently untype those schemas
+            // for the rest of the run
+            for (int i = 0; i < strippedSchemas.size(); i++) {
+                strippedSchemas.get(i).setType(strippedTypes.get(i));
+            }
         }
         if (!strippedPositions.isEmpty()) {
             // the clone has the same structure as the stripped source, so the walk visits its
