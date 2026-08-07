@@ -1172,12 +1172,7 @@ public class DefaultCodegen implements CodegenConfig {
                                             String requestMediaType, String requestToken,
                                             String responseMediaType, String responseToken,
                                             String targetResponseCode, ApiResponse targetResponse) {
-        boolean openapi31 = specVersionGreaterThanOrEqualTo310(openAPI);
-        Operation variant = ModelUtils.cloneOperation(original, openapi31);
-        // generators (e.g. SpringCodegen) read the extensions map without null-guards
-        if (variant.getExtensions() == null) {
-            variant.setExtensions(new LinkedHashMap<>());
-        }
+        Operation variant = shallowCopyOperation(original);
 
         // typed, collision-free operationId: request -> "With<Subtype>", response -> "As<Subtype>"
         StringBuilder operationId = new StringBuilder(baseId);
@@ -1191,26 +1186,55 @@ public class DefaultCodegen implements CodegenConfig {
 
         if (requestMediaType != null) {
             RequestBody requestBody = ModelUtils.getReferencedRequestBody(openAPI, original.getRequestBody());
-            variant.setRequestBody(narrowRequestBody(requestBody, requestMediaType, openapi31));
+            variant.setRequestBody(narrowRequestBody(requestBody, requestMediaType));
         }
         if (responseMediaType != null) {
-            variant.setResponses(narrowResponses(original.getResponses(), targetResponseCode, targetResponse, responseMediaType, openapi31));
+            variant.setResponses(narrowResponses(original.getResponses(), targetResponseCode, targetResponse, responseMediaType));
         }
         return variant;
     }
 
-    private RequestBody narrowRequestBody(RequestBody source, String mediaType, boolean openapi31) {
-        RequestBody copy = ModelUtils.cloneRequestBody(source, openapi31);
+    /**
+     * Copies an {@link Operation} one level deep: the copy gets its own parameter and extension lists,
+     * which the split writes to, and shares everything below — schemas above all, which it only reads.
+     * A deep copy would have to round-trip through the mapper, which drops any schema whose type is not
+     * a standard OpenAPI < 3.1 one.
+     */
+    private Operation shallowCopyOperation(Operation source) {
+        Operation copy = new Operation();
+        copy.setTags(source.getTags());
+        copy.setSummary(source.getSummary());
+        copy.setDescription(source.getDescription());
+        copy.setExternalDocs(source.getExternalDocs());
+        copy.setOperationId(source.getOperationId());
+        copy.setParameters(source.getParameters() == null ? null : new ArrayList<>(source.getParameters()));
+        copy.setRequestBody(source.getRequestBody());
+        copy.setResponses(source.getResponses());
+        copy.setCallbacks(source.getCallbacks());
+        copy.setDeprecated(source.getDeprecated());
+        copy.setSecurity(source.getSecurity() == null ? null : new ArrayList<>(source.getSecurity()));
+        copy.setServers(source.getServers());
+        // a non-null extensions map: the split writes the variant's place in the matrix into it, and
+        // generators (SpringCodegen for one) read it without null-guards
+        copy.setExtensions(source.getExtensions() == null ? new LinkedHashMap<>() : new LinkedHashMap<>(source.getExtensions()));
+        return copy;
+    }
+
+    private RequestBody narrowRequestBody(RequestBody source, String mediaType) {
+        RequestBody copy = new RequestBody();
+        copy.setDescription(source.getDescription());
+        copy.setRequired(source.getRequired());
+        copy.setExtensions(source.getExtensions());
         copy.setContent(singleContent(source.getContent(), mediaType));
         return copy;
     }
 
-    private ApiResponses narrowResponses(ApiResponses responses, String targetCode, ApiResponse targetResponse, String mediaType, boolean openapi31) {
+    private ApiResponses narrowResponses(ApiResponses responses, String targetCode, ApiResponse targetResponse, String mediaType) {
         ApiResponses copy = new ApiResponses();
         copy.setExtensions(responses.getExtensions());
         for (Map.Entry<String, ApiResponse> entry : responses.entrySet()) {
             if (entry.getKey().equals(targetCode)) {
-                copy.addApiResponse(entry.getKey(), narrowApiResponse(targetResponse, mediaType, openapi31));
+                copy.addApiResponse(entry.getKey(), narrowApiResponse(targetResponse, mediaType));
             } else {
                 copy.addApiResponse(entry.getKey(), entry.getValue());
             }
@@ -1218,8 +1242,12 @@ public class DefaultCodegen implements CodegenConfig {
         return copy;
     }
 
-    private ApiResponse narrowApiResponse(ApiResponse source, String mediaType, boolean openapi31) {
-        ApiResponse copy = ModelUtils.cloneApiResponse(source, openapi31);
+    private ApiResponse narrowApiResponse(ApiResponse source, String mediaType) {
+        ApiResponse copy = new ApiResponse();
+        copy.setDescription(source.getDescription());
+        copy.setHeaders(source.getHeaders());
+        copy.setLinks(source.getLinks());
+        copy.setExtensions(source.getExtensions());
         copy.setContent(singleContent(source.getContent(), mediaType));
         return copy;
     }
