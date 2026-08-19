@@ -734,9 +734,12 @@ public class DefaultGenerator implements Generator {
                         .findFirst()
                         .ifPresent(description -> operation.put("operationTagDescription", config.escapeText(description)));
                 Optional.ofNullable(config.additionalProperties().get("appVersion")).ifPresent(version -> operation.put("version", version));
+                operation.putAll(config.additionalProperties());
+                // apiPackage and modelPackage must be set after additionalProperties: generators
+                // may derive the final package names in processOpts (e.g. python prefixes them
+                // with packageName), and the raw user-supplied values would otherwise shadow them.
                 operation.put("apiPackage", config.apiPackage());
                 operation.put("modelPackage", config.modelPackage());
-                operation.putAll(config.additionalProperties());
                 operation.put("classname", config.toApiName(tag));
                 operation.put("classVarName", config.toApiVarName(tag));
                 operation.put("importPath", config.toApiImport(tag));
@@ -893,9 +896,12 @@ public class DefaultGenerator implements Generator {
                         .findFirst()
                         .ifPresent(description -> operation.put("operationTagDescription", config.escapeText(description)));
                 Optional.ofNullable(config.additionalProperties().get("appVersion")).ifPresent(version -> operation.put("version", version));
+                operation.putAll(config.additionalProperties());
+                // apiPackage and modelPackage must be set after additionalProperties: generators
+                // may derive the final package names in processOpts (e.g. python prefixes them
+                // with packageName), and the raw user-supplied values would otherwise shadow them.
                 operation.put("apiPackage", config.apiPackage());
                 operation.put("modelPackage", config.modelPackage());
-                operation.putAll(config.additionalProperties());
                 operation.put("classname", config.toApiName(tag));
                 operation.put("classVarName", config.toApiVarName(tag));
                 operation.put("importPath", config.toApiImport(tag));
