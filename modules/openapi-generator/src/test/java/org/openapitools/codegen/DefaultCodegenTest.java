@@ -5467,6 +5467,14 @@ public class DefaultCodegenTest {
         assertThat(codegen.divideOperationsByContentType(openAPI, "/reports/{id}/voucher", "get", voucher)).containsExactly(voucher);
         assertThat(codegen.fromOperation("/reports/{id}/voucher", "get", voucher, null).produces)
                 .extracting(m -> m.get("mediaType")).containsExactlyInAnyOrder("application/pdf", "application/json");
+
+        // only the split's own variants are narrowed: a spec-authored axis extension, with no variant group,
+        // does not turn an operation into one
+        voucher.addExtension(CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE, "text/csv");
+        assertThat(DefaultCodegen.getProducesInfo(openAPI, voucher)).containsExactlyInAnyOrder("application/pdf", "application/json");
+        CodegenOperation untouched = codegen.fromOperation("/reports/{id}/voucher", "get", voucher, null);
+        assertThat(untouched.hasProduces).isTrue();
+        assertThat(untouched.produces).extracting(m -> m.get("mediaType")).containsExactlyInAnyOrder("application/pdf", "application/json");
     }
 
     @Test

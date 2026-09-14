@@ -1266,11 +1266,11 @@ public class DefaultCodegen implements CodegenConfig {
      * variant or that axis was not split.
      */
     protected static String contentTypeVariantMediaType(Operation operation, String axisExtension) {
-        if (operation == null || operation.getExtensions() == null) {
-            return null;
+        if (!isContentTypeVariant(operation)) {
+            return null; // the split tags every variant with its group: a bare axis extension is not one
         }
         Object mediaType = operation.getExtensions().get(axisExtension);
-        return mediaType == null ? null : mediaType.toString();
+        return mediaType instanceof String ? (String) mediaType : null;
     }
 
     /**
@@ -4964,10 +4964,18 @@ public class DefaultCodegen implements CodegenConfig {
 
         if (operation.getResponses() != null && !operation.getResponses().isEmpty()) {
             ApiResponse methodResponse = findMethodResponse(operation.getResponses());
+            // a content-type variant speaks the single media-type its method response was narrowed to: produces
+            // is the Accept a client sends for it, so it is read from that response alone - the others, error
+            // ones typically, would widen it back and a variant typed on one media-type would ask the server for
+            // another. Those responses are otherwise untouched and keep typing their own body.
+            String producesResponseCode = contentTypeVariantMediaType(operation, CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE) == null
+                    ? null : findMethodResponseCode(operation.getResponses());
             for (Map.Entry<String, ApiResponse> operationGetResponsesEntry : operation.getResponses().entrySet()) {
                 String key = operationGetResponsesEntry.getKey();
                 ApiResponse response = ModelUtils.getReferencedApiResponse(openAPI, operationGetResponsesEntry.getValue());
-                addProducesInfo(response, op);
+                if (producesResponseCode == null || producesResponseCode.equals(key)) {
+                    addProducesInfo(response, op);
+                }
                 CodegenResponse r = fromResponse(key, response);
                 Map<String, Header> headers = response.getHeaders();
                 if (headers != null) {
@@ -5029,16 +5037,6 @@ public class DefaultCodegen implements CodegenConfig {
 
             if (methodResponse != null) {
                 handleMethodResponse(operation, schemas, op, methodResponse, importMapping);
-            }
-
-            // a content-type variant speaks the single media-type it was narrowed to: produces is the Accept a
-            // client sends for it, so the other responses - error ones, typically - must not widen it back, or
-            // a variant typed on one media-type would ask the server for another. Those responses are otherwise
-            // untouched and keep typing their own body.
-            String variantMediaType = contentTypeVariantMediaType(operation, CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE);
-            if (variantMediaType != null && op.produces != null) {
-                String encodedMediaType = "*/*".equals(variantMediaType) ? variantMediaType : escapeQuotationMark(variantMediaType);
-                op.produces.removeIf(mediaType -> !encodedMediaType.equals(mediaType.get("mediaType")));
             }
         }
 
