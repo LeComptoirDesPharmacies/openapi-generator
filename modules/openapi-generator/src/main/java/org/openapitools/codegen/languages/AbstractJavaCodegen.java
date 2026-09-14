@@ -2514,11 +2514,22 @@ public abstract class AbstractJavaCodegen extends DefaultCodegen implements Code
         operation.addExtension("x-accepts", accepts);
     }
 
+    /**
+     * A content-type variant is split off after {@link #preprocessOpenAPI} stamped the operation it comes
+     * from, so it carries that operation's Content-Type and Accept, for every media-type it declares: the
+     * variants are stamped again here, each with the single media-type it was narrowed to on each axis.
+     */
+    @Override
+    public List<Operation> divideOperationsByContentType(OpenAPI openAPI, String path, String httpMethod, Operation operation) {
+        List<Operation> variants = super.divideOperationsByContentType(openAPI, path, httpMethod, operation);
+        if (variants.size() > 1) {
+            variants.forEach(variant -> addContentTypeExtensions(openAPI, variant));
+        }
+        return variants;
+    }
+
     @Override
     public CodegenOperation fromOperation(String path, String httpMethod, Operation operation, List<Server> servers) {
-        // computed again here, after preprocessOpenAPI: an operation derived from the spec since - a
-        // content-type variant, a callback - carries the media-types of the operation it came from, or none
-        addContentTypeExtensions(this.openAPI, operation);
         CodegenOperation op = super.fromOperation(path, httpMethod, operation, servers);
         op.path = sanitizePath(op.path);
         return op;

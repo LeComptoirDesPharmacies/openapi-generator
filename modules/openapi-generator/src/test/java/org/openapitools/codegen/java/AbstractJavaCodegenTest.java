@@ -1120,8 +1120,8 @@ public class AbstractJavaCodegenTest {
     @Test
     public void contentTypeVariantsCarryTheirOwnAcceptAndContentType() {
         // x-accepts and x-content-type are computed in preprocessOpenAPI, before the operations are split by
-        // content-type; fromOperation computes them again, so a variant does not inherit the media-types of
-        // the operation it was split from
+        // content-type; the variants are stamped again as they are split, so none inherits the media-types
+        // of the operation it was split from
         codegen.setSplitOperationsByContentType(true);
         OpenAPI openAPI = TestUtils.parseSpec("src/test/resources/3_0/issue6708-split-by-content-type-error-responses.yaml");
         codegen.setOpenAPI(openAPI);
