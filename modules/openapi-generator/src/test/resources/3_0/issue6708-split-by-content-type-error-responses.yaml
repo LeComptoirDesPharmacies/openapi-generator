@@ -1,15 +1,13 @@
-openapi: 3.0.3
+openapi: 3.0.1
 info:
-  title: splitOperationsByContentType - error responses
-  description: |
-    Operations whose success response is split by content-type while their error responses are JSON:
-    each variant must keep sending the Accept of the media-type it was narrowed to, not the JSON of the
-    errors (which every variant still declares).
+  title: split operations by content-type (issue 6708) - json error responses
   version: 1.0.0
 paths:
   /reports/{id}:
     get:
       operationId: getReport
+      tags:
+        - report
       parameters:
         - name: id
           in: path
@@ -18,7 +16,7 @@ paths:
             type: string
       responses:
         '200':
-          description: the report, as a structure or as a binary export
+          description: ok
           content:
             application/json:
               schema:
@@ -42,6 +40,8 @@ paths:
   /reports:
     post:
       operationId: createReport
+      tags:
+        - report
       requestBody:
         content:
           application/json:
@@ -52,7 +52,7 @@ paths:
               $ref: '#/components/schemas/ReportXml'
       responses:
         '200':
-          description: the receipt, as a structure or as a PDF
+          description: ok
           content:
             application/json:
               schema:
@@ -69,8 +69,10 @@ paths:
                 $ref: '#/components/schemas/Error'
   /reports/{id}/voucher:
     get:
-      description: not split (a single success content-type), so left exactly as before
+      description: a single success content-type, so not split
       operationId: getReportVoucher
+      tags:
+        - report
       parameters:
         - name: id
           in: path
@@ -79,7 +81,7 @@ paths:
             type: string
       responses:
         '200':
-          description: the voucher
+          description: ok
           content:
             application/pdf:
               schema:
@@ -96,17 +98,19 @@ components:
     Report:
       type: object
       properties:
-        title:
+        id:
+          type: string
+        name:
           type: string
     ReportXml:
       type: object
       properties:
-        heading:
+        ref:
           type: string
     Receipt:
       type: object
       properties:
-        id:
+        number:
           type: string
     Error:
       type: object

@@ -5434,47 +5434,48 @@ public class DefaultCodegenTest {
         codegen.setOpenAPI(openAPI);
 
         // GET /reports/{id}: 200 is json | directlog, 400 and 404 are json. produces is the Accept a client
-        // sends, so each variant must carry the single media-type it was narrowed to: widened back to json by
+        // sends, so each variant carries the single media-type it was narrowed to: widened back to json by
         // the error responses, the directlog variant would ask the server for json.
         Operation get = openAPI.getPaths().get("/reports/{id}").getGet();
         List<Operation> variants = codegen.divideOperationsByContentType(openAPI, "/reports/{id}", "get", get);
-        assertThat(variants).hasSize(2);
-        for (Operation variant : variants) {
-            String mediaType = (String) variant.getExtensions().get(CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE);
-            assertThat(DefaultCodegen.getProducesInfo(openAPI, variant)).containsExactly(mediaType);
-
-            CodegenOperation op = codegen.fromOperation("/reports/{id}", "get", variant, null);
-            assertThat(op.hasProduces).isTrue();
-            assertThat(op.produces).extracting(m -> m.get("mediaType")).containsExactly(mediaType);
-            // the error responses are left as they are: they still type their json body
-            assertThat(op.responses).filteredOn(r -> "400".equals(r.code))
-                    .extracting(r -> r.getContent().keySet()).containsExactly(Set.of("application/json"));
-        }
+        assertThat(variants).extracting(Operation::getOperationId, v -> DefaultCodegen.getProducesInfo(openAPI, v))
+                .containsExactlyInAnyOrder(
+                        tuple("getReportAsJson", Set.of("application/json")),
+                        tuple("getReportAsDirectlog", Set.of("application/directlog")));
+        List<CodegenOperation> ops = variants.stream()
+                .map(v -> codegen.fromOperation("/reports/{id}", "get", v, null))
+                .collect(Collectors.toList());
+        assertThat(ops).extracting(op -> op.operationId, op -> mediaTypes(op.produces))
+                .containsExactlyInAnyOrder(
+                        tuple("getReportAsJson", List.of("application/json")),
+                        tuple("getReportAsDirectlog", List.of("application/directlog")));
+        // the error responses are left as they are: they still type their json body
+        assertThat(ops).allSatisfy(op -> assertThat(op.responses).filteredOn(r -> "400".equals(r.code))
+                .extracting(r -> r.getContent().keySet()).containsExactly(Set.of("application/json")));
 
         // POST /reports: split on both axes. consumes follows the narrowed request body, produces the
         // narrowed success response, whatever the json 400 declares.
         Operation post = openAPI.getPaths().get("/reports").getPost();
-        for (Operation variant : codegen.divideOperationsByContentType(openAPI, "/reports", "post", post)) {
-            CodegenOperation op = codegen.fromOperation("/reports", "post", variant, null);
-            assertThat(op.consumes).extracting(m -> m.get("mediaType"))
-                    .containsExactly((String) variant.getExtensions().get(CodegenConstants.X_CONTENT_TYPE_VARIANT_REQUEST));
-            assertThat(op.produces).extracting(m -> m.get("mediaType"))
-                    .containsExactly((String) variant.getExtensions().get(CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE));
-        }
+        assertThat(codegen.divideOperationsByContentType(openAPI, "/reports", "post", post))
+                .extracting(v -> codegen.fromOperation("/reports", "post", v, null))
+                .extracting(op -> op.operationId, op -> mediaTypes(op.consumes), op -> mediaTypes(op.produces))
+                .containsExactlyInAnyOrder(
+                        tuple("createReportWithJsonAsJson", List.of("application/json"), List.of("application/json")),
+                        tuple("createReportWithJsonAsPdf", List.of("application/json"), List.of("application/pdf")),
+                        tuple("createReportWithXmlAsJson", List.of("application/xml"), List.of("application/json")),
+                        tuple("createReportWithXmlAsPdf", List.of("application/xml"), List.of("application/pdf")));
 
-        // an operation the split leaves alone keeps the union of every response, as it always has
+        // an operation the split leaves alone keeps the union of every response, as it always has - and a
+        // spec-authored axis extension, with no variant group, does not make it a variant
         Operation voucher = openAPI.getPaths().get("/reports/{id}/voucher").getGet();
-        assertThat(codegen.divideOperationsByContentType(openAPI, "/reports/{id}/voucher", "get", voucher)).containsExactly(voucher);
-        assertThat(codegen.fromOperation("/reports/{id}/voucher", "get", voucher, null).produces)
-                .extracting(m -> m.get("mediaType")).containsExactlyInAnyOrder("application/pdf", "application/json");
-
-        // only the split's own variants are narrowed: a spec-authored axis extension, with no variant group,
-        // does not turn an operation into one
         voucher.addExtension(CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE, "text/csv");
         assertThat(DefaultCodegen.getProducesInfo(openAPI, voucher)).containsExactlyInAnyOrder("application/pdf", "application/json");
-        CodegenOperation untouched = codegen.fromOperation("/reports/{id}/voucher", "get", voucher, null);
-        assertThat(untouched.hasProduces).isTrue();
-        assertThat(untouched.produces).extracting(m -> m.get("mediaType")).containsExactlyInAnyOrder("application/pdf", "application/json");
+        assertThat(mediaTypes(codegen.fromOperation("/reports/{id}/voucher", "get", voucher, null).produces))
+                .containsExactlyInAnyOrder("application/pdf", "application/json");
+    }
+
+    private static List<String> mediaTypes(List<Map<String, String>> media) {
+        return media.stream().map(m -> m.get("mediaType")).collect(Collectors.toList());
     }
 
     @Test

@@ -2516,12 +2516,9 @@ public abstract class AbstractJavaCodegen extends DefaultCodegen implements Code
 
     @Override
     public CodegenOperation fromOperation(String path, String httpMethod, Operation operation, List<Server> servers) {
-        if (isContentTypeVariant(operation)) {
-            // preprocessOpenAPI computed x-content-type and x-accepts on the operation this variant was split
-            // from, hence for every media-type it declares: recompute them on the variant, which is narrowed
-            // to a single one on each axis
-            addContentTypeExtensions(this.openAPI, operation);
-        }
+        // computed again here, after preprocessOpenAPI: an operation derived from the spec since - a
+        // content-type variant, a callback - carries the media-types of the operation it came from, or none
+        addContentTypeExtensions(this.openAPI, operation);
         CodegenOperation op = super.fromOperation(path, httpMethod, operation, servers);
         op.path = sanitizePath(op.path);
         return op;

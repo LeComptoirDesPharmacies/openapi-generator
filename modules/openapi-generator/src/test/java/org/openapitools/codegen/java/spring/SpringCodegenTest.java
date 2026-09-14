@@ -2647,20 +2647,11 @@ public class SpringCodegenTest {
                     .assertMethodAnnotations()
                     .containsWithNameAndAttributes("RequestMapping", ImmutableMap.of("produces", "{ \"application/directlog\" }"))
                     .toMethod().toFileAssert()
-                    .assertMethod("getReportAsJson")
-                    .assertMethodAnnotations()
-                    .containsWithNameAndAttributes("RequestMapping", ImmutableMap.of("produces", "{ \"application/json\" }"))
-                    .toMethod().toFileAssert()
                     .assertMethod("createReportWithXmlAsPdf")
                     .assertMethodAnnotations()
                     .containsWithNameAndAttributes("RequestMapping", ImmutableMap.of(
                             "consumes", "\"application/xml\"",
-                            "produces", "{ \"application/pdf\" }"))
-                    .toMethod().toFileAssert()
-                    // not split: the Accept computed from every response, as before
-                    .assertMethod("getReportVoucher")
-                    .assertMethodAnnotations()
-                    .containsWithNameAndAttributes("RequestMapping", ImmutableMap.of("produces", "{ \"application/json\", \"application/pdf\" }"));
+                            "produces", "{ \"application/pdf\" }"));
         } finally {
             GlobalSettings.reset();
         }

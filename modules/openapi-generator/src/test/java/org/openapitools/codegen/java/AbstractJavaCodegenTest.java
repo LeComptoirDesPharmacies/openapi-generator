@@ -27,7 +27,6 @@ import io.swagger.v3.parser.core.models.ParseOptions;
 import org.mockito.Answers;
 import org.mockito.Mockito;
 import org.openapitools.codegen.CodegenConstants;
-import org.openapitools.codegen.CodegenOperation;
 import org.openapitools.codegen.CodegenModel;
 import org.openapitools.codegen.CodegenParameter;
 import org.openapitools.codegen.CodegenProperty;
@@ -46,6 +45,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.openapitools.codegen.languages.AbstractJavaCodegen.DISABLE_DISCRIMINATOR_JSON_IGNORE_PROPERTIES;
 
 public class AbstractJavaCodegenTest {
@@ -1120,7 +1120,8 @@ public class AbstractJavaCodegenTest {
     @Test
     public void contentTypeVariantsCarryTheirOwnAcceptAndContentType() {
         // x-accepts and x-content-type are computed in preprocessOpenAPI, before the operations are split by
-        // content-type: a variant must not inherit the media-types of the operation it was split from
+        // content-type; fromOperation computes them again, so a variant does not inherit the media-types of
+        // the operation it was split from
         codegen.setSplitOperationsByContentType(true);
         OpenAPI openAPI = TestUtils.parseSpec("src/test/resources/3_0/issue6708-split-by-content-type-error-responses.yaml");
         codegen.setOpenAPI(openAPI);
@@ -1128,27 +1129,26 @@ public class AbstractJavaCodegenTest {
 
         // GET /reports/{id}: 200 is json | directlog, 400 and 404 are json
         Operation get = openAPI.getPaths().get("/reports/{id}").getGet();
-        List<Operation> getVariants = codegen.divideOperationsByContentType(openAPI, "/reports/{id}", "get", get);
-        assertThat(getVariants).hasSize(2);
-        for (Operation variant : getVariants) {
-            CodegenOperation op = codegen.fromOperation("/reports/{id}", "get", variant, null);
-            assertThat((String[]) op.vendorExtensions.get("x-accepts"))
-                    .containsExactly((String) variant.getExtensions().get(CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE));
-        }
+        assertThat(codegen.divideOperationsByContentType(openAPI, "/reports/{id}", "get", get))
+                .extracting(v -> codegen.fromOperation("/reports/{id}", "get", v, null))
+                .extracting(op -> op.operationId, op -> List.of((String[]) op.vendorExtensions.get("x-accepts")))
+                .containsExactlyInAnyOrder(
+                        tuple("getReportAsJson", List.of("application/json")),
+                        tuple("getReportAsDirectlog", List.of("application/directlog")));
 
         // POST /reports: request json | xml, 200 json | pdf, 400 json
         Operation post = openAPI.getPaths().get("/reports").getPost();
-        List<Operation> postVariants = codegen.divideOperationsByContentType(openAPI, "/reports", "post", post);
-        assertThat(postVariants).hasSize(4);
-        for (Operation variant : postVariants) {
-            CodegenOperation op = codegen.fromOperation("/reports", "post", variant, null);
-            assertThat(op.vendorExtensions.get("x-content-type"))
-                    .isEqualTo(variant.getExtensions().get(CodegenConstants.X_CONTENT_TYPE_VARIANT_REQUEST));
-            assertThat((String[]) op.vendorExtensions.get("x-accepts"))
-                    .containsExactly((String) variant.getExtensions().get(CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE));
-        }
+        assertThat(codegen.divideOperationsByContentType(openAPI, "/reports", "post", post))
+                .extracting(v -> codegen.fromOperation("/reports", "post", v, null))
+                .extracting(op -> op.operationId, op -> op.vendorExtensions.get("x-content-type"),
+                        op -> List.of((String[]) op.vendorExtensions.get("x-accepts")))
+                .containsExactlyInAnyOrder(
+                        tuple("createReportWithJsonAsJson", "application/json", List.of("application/json")),
+                        tuple("createReportWithJsonAsPdf", "application/json", List.of("application/pdf")),
+                        tuple("createReportWithXmlAsJson", "application/xml", List.of("application/json")),
+                        tuple("createReportWithXmlAsPdf", "application/xml", List.of("application/pdf")));
 
-        // not split: the Accept computed in preprocessOpenAPI from every response, as before
+        // not split: the Accept computed from every response, as before
         Operation voucher = openAPI.getPaths().get("/reports/{id}/voucher").getGet();
         assertThat((String[]) codegen.fromOperation("/reports/{id}/voucher", "get", voucher, null).vendorExtensions.get("x-accepts"))
                 .containsExactly("application/json", "application/pdf");

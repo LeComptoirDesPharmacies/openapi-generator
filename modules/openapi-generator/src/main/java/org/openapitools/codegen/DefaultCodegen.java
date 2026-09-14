@@ -1266,10 +1266,7 @@ public class DefaultCodegen implements CodegenConfig {
      * variant or that axis was not split.
      */
     protected static String contentTypeVariantMediaType(Operation operation, String axisExtension) {
-        if (!isContentTypeVariant(operation)) {
-            return null; // the split tags every variant with its group: a bare axis extension is not one
-        }
-        Object mediaType = operation.getExtensions().get(axisExtension);
+        Object mediaType = isContentTypeVariant(operation) ? operation.getExtensions().get(axisExtension) : null;
         return mediaType instanceof String ? (String) mediaType : null;
     }
 
@@ -4964,16 +4961,16 @@ public class DefaultCodegen implements CodegenConfig {
 
         if (operation.getResponses() != null && !operation.getResponses().isEmpty()) {
             ApiResponse methodResponse = findMethodResponse(operation.getResponses());
-            // a content-type variant speaks the single media-type its method response was narrowed to: produces
-            // is the Accept a client sends for it, so it is read from that response alone - the others, error
-            // ones typically, would widen it back and a variant typed on one media-type would ask the server for
-            // another. Those responses are otherwise untouched and keep typing their own body.
-            String producesResponseCode = contentTypeVariantMediaType(operation, CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE) == null
-                    ? null : findMethodResponseCode(operation.getResponses());
+            // a content-type variant produces only what its method response, the one the split narrowed,
+            // declares (see getProducesInfo); any other operation produces the union of its responses
+            boolean producesNarrowed = contentTypeVariantMediaType(operation, CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE) != null;
+            if (producesNarrowed) {
+                addProducesInfo(methodResponse, op);
+            }
             for (Map.Entry<String, ApiResponse> operationGetResponsesEntry : operation.getResponses().entrySet()) {
                 String key = operationGetResponsesEntry.getKey();
                 ApiResponse response = ModelUtils.getReferencedApiResponse(openAPI, operationGetResponsesEntry.getValue());
-                if (producesResponseCode == null || producesResponseCode.equals(key)) {
+                if (!producesNarrowed) {
                     addProducesInfo(response, op);
                 }
                 CodegenResponse r = fromResponse(key, response);
