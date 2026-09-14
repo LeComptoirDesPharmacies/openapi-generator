@@ -36,6 +36,11 @@ one: `With<Subtype>` for the request axis, `As<Subtype>` for the response axis, 
 The content-type declared first on each axis is the default one, consistently with the rest of the
 generator. The option is opt-in and off by default, because it changes the shape of the generated API.
 
+Each variant speaks only the media-type it was narrowed to: its `consumes` and `produces` — hence the
+`Content-Type` and `Accept` a generated client sends — are that single media-type, even when other responses
+of the operation, error ones typically, declare others. Those responses are otherwise left as they are and
+keep typing their own body.
+
 Each generated operation carries `x-content-type-variant-*` extensions recording the group it was split
 from, the content-type it was narrowed to on each axis and the rank of that content-type in its axis. A
 generator whose language can express the whole matrix in a single construct uses them to merge the variants

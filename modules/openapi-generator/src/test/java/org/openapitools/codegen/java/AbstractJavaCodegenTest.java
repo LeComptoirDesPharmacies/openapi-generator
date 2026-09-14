@@ -20,12 +20,14 @@ package org.openapitools.codegen.java;
 import io.swagger.parser.OpenAPIParser;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.media.*;
 import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.parser.core.models.ParseOptions;
 import org.mockito.Answers;
 import org.mockito.Mockito;
 import org.openapitools.codegen.CodegenConstants;
+import org.openapitools.codegen.CodegenOperation;
 import org.openapitools.codegen.CodegenModel;
 import org.openapitools.codegen.CodegenParameter;
 import org.openapitools.codegen.CodegenProperty;
@@ -1113,5 +1115,42 @@ public class AbstractJavaCodegenTest {
     @Test(description = "test sanitizing name of dataType when using schemaMapping and oneOf/allOf (issue 20718)")
     public void testSanitizedDataType() {
         assertThat(codegen.sanitizeDataType("org.somepkg.DataType")).isEqualTo("orgsomepkgDataType");
+    }
+
+    @Test
+    public void contentTypeVariantsCarryTheirOwnAcceptAndContentType() {
+        // x-accepts and x-content-type are computed in preprocessOpenAPI, before the operations are split by
+        // content-type: a variant must not inherit the media-types of the operation it was split from
+        codegen.setSplitOperationsByContentType(true);
+        OpenAPI openAPI = TestUtils.parseSpec("src/test/resources/3_0/issue6708-split-by-content-type-error-responses.yaml");
+        codegen.setOpenAPI(openAPI);
+        codegen.preprocessOpenAPI(openAPI);
+
+        // GET /reports/{id}: 200 is json | directlog, 400 and 404 are json
+        Operation get = openAPI.getPaths().get("/reports/{id}").getGet();
+        List<Operation> getVariants = codegen.divideOperationsByContentType(openAPI, "/reports/{id}", "get", get);
+        assertThat(getVariants).hasSize(2);
+        for (Operation variant : getVariants) {
+            CodegenOperation op = codegen.fromOperation("/reports/{id}", "get", variant, null);
+            assertThat((String[]) op.vendorExtensions.get("x-accepts"))
+                    .containsExactly((String) variant.getExtensions().get(CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE));
+        }
+
+        // POST /reports: request json | xml, 200 json | pdf, 400 json
+        Operation post = openAPI.getPaths().get("/reports").getPost();
+        List<Operation> postVariants = codegen.divideOperationsByContentType(openAPI, "/reports", "post", post);
+        assertThat(postVariants).hasSize(4);
+        for (Operation variant : postVariants) {
+            CodegenOperation op = codegen.fromOperation("/reports", "post", variant, null);
+            assertThat(op.vendorExtensions.get("x-content-type"))
+                    .isEqualTo(variant.getExtensions().get(CodegenConstants.X_CONTENT_TYPE_VARIANT_REQUEST));
+            assertThat((String[]) op.vendorExtensions.get("x-accepts"))
+                    .containsExactly((String) variant.getExtensions().get(CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE));
+        }
+
+        // not split: the Accept computed in preprocessOpenAPI from every response, as before
+        Operation voucher = openAPI.getPaths().get("/reports/{id}/voucher").getGet();
+        assertThat((String[]) codegen.fromOperation("/reports/{id}/voucher", "get", voucher, null).vendorExtensions.get("x-accepts"))
+                .containsExactly("application/json", "application/pdf");
     }
 }

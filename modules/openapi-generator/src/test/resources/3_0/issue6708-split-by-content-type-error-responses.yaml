@@ -1,0 +1,115 @@
+openapi: 3.0.3
+info:
+  title: splitOperationsByContentType - error responses
+  description: |
+    Operations whose success response is split by content-type while their error responses are JSON:
+    each variant must keep sending the Accept of the media-type it was narrowed to, not the JSON of the
+    errors (which every variant still declares).
+  version: 1.0.0
+paths:
+  /reports/{id}:
+    get:
+      operationId: getReport
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: the report, as a structure or as a binary export
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+            application/directlog:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: invalid id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: no such report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /reports:
+    post:
+      operationId: createReport
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Report'
+          application/xml:
+            schema:
+              $ref: '#/components/schemas/ReportXml'
+      responses:
+        '200':
+          description: the receipt, as a structure or as a PDF
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Receipt'
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: invalid report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /reports/{id}/voucher:
+    get:
+      description: not split (a single success content-type), so left exactly as before
+      operationId: getReportVoucher
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: the voucher
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: invalid id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Report:
+      type: object
+      properties:
+        title:
+          type: string
+    ReportXml:
+      type: object
+      properties:
+        heading:
+          type: string
+    Receipt:
+      type: object
+      properties:
+        id:
+          type: string
+    Error:
+      type: object
+      properties:
+        message:
+          type: string

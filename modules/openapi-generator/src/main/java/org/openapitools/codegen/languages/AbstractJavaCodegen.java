@@ -2349,14 +2349,7 @@ public abstract class AbstractJavaCodegen extends DefaultCodegen implements Code
                 }
                 for (Operation operation : path.readOperations()) {
                     LOGGER.info("Processing operation {}", operation.getOperationId());
-                    if (hasBodyParameter(operation) || hasFormParameter(operation)) {
-                        String defaultContentType = hasFormParameter(operation) ? "application/x-www-form-urlencoded" : "application/json";
-                        List<String> consumes = new ArrayList<>(getConsumesInfo(openAPI, operation));
-                        String contentType = consumes.isEmpty() ? defaultContentType : consumes.get(0);
-                        operation.addExtension("x-content-type", contentType);
-                    }
-                    String[] accepts = getAccepts(openAPI, operation);
-                    operation.addExtension("x-accepts", accepts);
+                    addContentTypeExtensions(openAPI, operation);
                 }
             }
         }
@@ -2506,8 +2499,29 @@ public abstract class AbstractJavaCodegen extends DefaultCodegen implements Code
         }
     }
 
+    /**
+     * Records on the operation the Content-Type ({@code x-content-type}) and Accept ({@code x-accepts}) the
+     * generated client sends for it, which the templates read.
+     */
+    private void addContentTypeExtensions(OpenAPI openAPI, Operation operation) {
+        if (hasBodyParameter(operation) || hasFormParameter(operation)) {
+            String defaultContentType = hasFormParameter(operation) ? "application/x-www-form-urlencoded" : "application/json";
+            List<String> consumes = new ArrayList<>(getConsumesInfo(openAPI, operation));
+            String contentType = consumes.isEmpty() ? defaultContentType : consumes.get(0);
+            operation.addExtension("x-content-type", contentType);
+        }
+        String[] accepts = getAccepts(openAPI, operation);
+        operation.addExtension("x-accepts", accepts);
+    }
+
     @Override
     public CodegenOperation fromOperation(String path, String httpMethod, Operation operation, List<Server> servers) {
+        if (isContentTypeVariant(operation)) {
+            // preprocessOpenAPI computed x-content-type and x-accepts on the operation this variant was split
+            // from, hence for every media-type it declares: recompute them on the variant, which is narrowed
+            // to a single one on each axis
+            addContentTypeExtensions(this.openAPI, operation);
+        }
         CodegenOperation op = super.fromOperation(path, httpMethod, operation, servers);
         op.path = sanitizePath(op.path);
         return op;

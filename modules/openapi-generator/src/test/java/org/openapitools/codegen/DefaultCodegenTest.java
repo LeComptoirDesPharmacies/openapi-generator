@@ -5427,6 +5427,49 @@ public class DefaultCodegenTest {
     }
 
     @Test
+    public void splitOperationsByContentTypeNarrowsProducesToTheVariantMediaType() {
+        DefaultCodegen codegen = new DefaultCodegen();
+        codegen.setSplitOperationsByContentType(true);
+        OpenAPI openAPI = TestUtils.parseSpec("src/test/resources/3_0/issue6708-split-by-content-type-error-responses.yaml");
+        codegen.setOpenAPI(openAPI);
+
+        // GET /reports/{id}: 200 is json | directlog, 400 and 404 are json. produces is the Accept a client
+        // sends, so each variant must carry the single media-type it was narrowed to: widened back to json by
+        // the error responses, the directlog variant would ask the server for json.
+        Operation get = openAPI.getPaths().get("/reports/{id}").getGet();
+        List<Operation> variants = codegen.divideOperationsByContentType(openAPI, "/reports/{id}", "get", get);
+        assertThat(variants).hasSize(2);
+        for (Operation variant : variants) {
+            String mediaType = (String) variant.getExtensions().get(CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE);
+            assertThat(DefaultCodegen.getProducesInfo(openAPI, variant)).containsExactly(mediaType);
+
+            CodegenOperation op = codegen.fromOperation("/reports/{id}", "get", variant, null);
+            assertThat(op.hasProduces).isTrue();
+            assertThat(op.produces).extracting(m -> m.get("mediaType")).containsExactly(mediaType);
+            // the error responses are left as they are: they still type their json body
+            assertThat(op.responses).filteredOn(r -> "400".equals(r.code))
+                    .extracting(r -> r.getContent().keySet()).containsExactly(Set.of("application/json"));
+        }
+
+        // POST /reports: split on both axes. consumes follows the narrowed request body, produces the
+        // narrowed success response, whatever the json 400 declares.
+        Operation post = openAPI.getPaths().get("/reports").getPost();
+        for (Operation variant : codegen.divideOperationsByContentType(openAPI, "/reports", "post", post)) {
+            CodegenOperation op = codegen.fromOperation("/reports", "post", variant, null);
+            assertThat(op.consumes).extracting(m -> m.get("mediaType"))
+                    .containsExactly((String) variant.getExtensions().get(CodegenConstants.X_CONTENT_TYPE_VARIANT_REQUEST));
+            assertThat(op.produces).extracting(m -> m.get("mediaType"))
+                    .containsExactly((String) variant.getExtensions().get(CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE));
+        }
+
+        // an operation the split leaves alone keeps the union of every response, as it always has
+        Operation voucher = openAPI.getPaths().get("/reports/{id}/voucher").getGet();
+        assertThat(codegen.divideOperationsByContentType(openAPI, "/reports/{id}/voucher", "get", voucher)).containsExactly(voucher);
+        assertThat(codegen.fromOperation("/reports/{id}/voucher", "get", voucher, null).produces)
+                .extracting(m -> m.get("mediaType")).containsExactlyInAnyOrder("application/pdf", "application/json");
+    }
+
+    @Test
     public void splitOperationsByContentTypeIsAGlobalOption() {
         // the behaviour is language-neutral, so the option is global rather than declared - and documented -
         // by every single generator
