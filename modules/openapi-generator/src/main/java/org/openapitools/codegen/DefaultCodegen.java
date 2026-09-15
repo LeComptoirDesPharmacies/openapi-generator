@@ -1271,6 +1271,32 @@ public class DefaultCodegen implements CodegenConfig {
     }
 
     /**
+     * The Accept a client sends for a variant narrowed on its response: the media-type it was narrowed to
+     * at full weight, then those its other responses - errors, typically - declare at {@code q=0.5}, in
+     * declaration order. A server negotiating on Accept then serves the former on success and can still
+     * serve the latter on failure, e.g. {@code ["text/csv", "application/json;q=0.5"]}. Templates read it
+     * as {@link CodegenConstants#X_CONTENT_TYPE_VARIANT_ACCEPTS}, or joined as
+     * {@link CodegenConstants#X_CONTENT_TYPE_VARIANT_ACCEPT}; {@code produces} itself stays narrowed to the
+     * variant's media-type, which is what a server generator maps the variant on.
+     */
+    protected List<String> contentTypeVariantAccepts(String mediaType, Operation operation, ApiResponse methodResponse) {
+        Set<String> others = new LinkedHashSet<>();
+        for (ApiResponse r : operation.getResponses().values()) {
+            ApiResponse response = ModelUtils.getReferencedApiResponse(openAPI, r);
+            if (response != methodResponse && response != null && response.getContent() != null) {
+                others.addAll(response.getContent().keySet());
+            }
+        }
+        others.remove(mediaType);
+        List<String> accepts = new ArrayList<>(others.size() + 1);
+        accepts.add(mediaType);
+        for (String other : others) {
+            accepts.add(other + ";q=0.5");
+        }
+        return accepts;
+    }
+
+    /**
      * Builds one operation variant narrowed to a single request and/or response media-type (a {@code null}
      * media-type leaves that axis untouched), with a typed, collision-free operationId.
      */
@@ -5034,6 +5060,11 @@ public class DefaultCodegen implements CodegenConfig {
 
             if (methodResponse != null) {
                 handleMethodResponse(operation, schemas, op, methodResponse, importMapping);
+            }
+            if (producesNarrowed) {
+                List<String> accepts = contentTypeVariantAccepts(op.produces.get(0).get("mediaType"), operation, methodResponse);
+                op.vendorExtensions.put(CodegenConstants.X_CONTENT_TYPE_VARIANT_ACCEPTS, accepts);
+                op.vendorExtensions.put(CodegenConstants.X_CONTENT_TYPE_VARIANT_ACCEPT, String.join(", ", accepts));
             }
         }
 

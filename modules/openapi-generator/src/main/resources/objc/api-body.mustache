@@ -110,7 +110,7 @@ NSInteger k{{classname}}MissingParamErrorCode = 234513;
     }
     {{/headerParams}}
     // HTTP header `Accept`
-    NSString *acceptHeader = [self.apiClient.sanitizer selectHeaderAccept:@[{{#produces}}@"{{{mediaType}}}"{{^-last}}, {{/-last}}{{/produces}}]];
+    NSString *acceptHeader = {{#vendorExtensions.x-content-type-variant-accept}}@"{{{.}}}"{{/vendorExtensions.x-content-type-variant-accept}}{{^vendorExtensions.x-content-type-variant-accept}}[self.apiClient.sanitizer selectHeaderAccept:@[{{#produces}}@"{{{mediaType}}}"{{^-last}}, {{/-last}}{{/produces}}]]{{/vendorExtensions.x-content-type-variant-accept}};
     if(acceptHeader.length > 0) {
         headerParams[@"Accept"] = acceptHeader;
     }

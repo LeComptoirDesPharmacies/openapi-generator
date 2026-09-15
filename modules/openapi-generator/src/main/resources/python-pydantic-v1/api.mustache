@@ -264,8 +264,13 @@ class {{classname}}:
 {{/bodyParam}}
         {{#hasProduces}}
         # set the HTTP header `Accept`
+        {{#vendorExtensions.x-content-type-variant-accept}}
+        _header_params['Accept'] = '{{{vendorExtensions.x-content-type-variant-accept}}}'  # noqa: E501
+        {{/vendorExtensions.x-content-type-variant-accept}}
+        {{^vendorExtensions.x-content-type-variant-accept}}
         _header_params['Accept'] = self.api_client.select_header_accept(
             [{{#produces}}'{{{mediaType}}}'{{^-last}}, {{/-last}}{{/produces}}])  # noqa: E501
+        {{/vendorExtensions.x-content-type-variant-accept}}
 
         {{/hasProduces}}
         {{#hasConsumes}}

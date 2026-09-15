@@ -158,7 +158,7 @@ public class {{classname}} {
             {{#x-content-type}}
             reqSpec.setContentType("{{{x-content-type}}}");
             {{/x-content-type}}
-            reqSpec.setAccept("{{#x-accepts}}{{{.}}}{{^-last}},{{/-last}}{{/x-accepts}}");
+            reqSpec.setAccept("{{#x-content-type-variant-accept}}{{{.}}}{{/x-content-type-variant-accept}}{{^x-content-type-variant-accept}}{{#x-accepts}}{{{.}}}{{^-last}},{{/-last}}{{/x-accepts}}{{/x-content-type-variant-accept}}");
             {{/vendorExtensions}}
             this.respSpec = new ResponseSpecBuilder();
         }

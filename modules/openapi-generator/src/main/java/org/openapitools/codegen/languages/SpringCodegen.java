@@ -1460,6 +1460,14 @@ public class SpringCodegen extends AbstractJavaCodegen
 
         CodegenOperation codegenOperation = super.fromOperation(path, httpMethod, operation, servers);
 
+        if (SPRING_CLOUD_LIBRARY.equals(library)
+                && codegenOperation.vendorExtensions.containsKey(CodegenConstants.X_CONTENT_TYPE_VARIANT_ACCEPT)) {
+            // SpringMvcContract sends produces[0] alone as Accept: the weighted Accept of a content-type
+            // variant goes through the headers attribute instead, which it sends verbatim (api.mustache)
+            codegenOperation.vendorExtensions.put("x-spring-cloud-accept",
+                    codegenOperation.vendorExtensions.get(CodegenConstants.X_CONTENT_TYPE_VARIANT_ACCEPT));
+        }
+
         // add org.springframework.format.annotation.DateTimeFormat when needed
         codegenOperation.allParams.stream().filter(p -> p.isDate || p.isDateTime).findFirst()
                 .ifPresent(p -> codegenOperation.imports.add("DateTimeFormat"));

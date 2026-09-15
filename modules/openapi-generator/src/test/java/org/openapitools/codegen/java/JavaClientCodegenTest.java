@@ -2264,6 +2264,28 @@ public class JavaClientCodegenTest {
                                 + " objectParam.getSomeInteger()));");
     }
 
+    @Test
+    public void splitOperationsByContentTypeVariantsSendAWeightedAccept() {
+        // a variant asks for its own media-type first and still accepts, at a lower weight, what the error
+        // responses declare - not what selectHeaderAccept would pick from that list, the errors' json
+        final String spec = "src/test/resources/3_0/issue6708-split-by-content-type-error-responses.yaml";
+        final Consumer<CodegenConfigurator> split = configurator ->
+                configurator.addGlobalProperty(CodegenConstants.SPLIT_OPERATIONS_BY_CONTENT_TYPE, "true");
+
+        Map<String, File> okhttp = generateFromContract(spec, "okhttp-gson", new HashMap<>(), split);
+        assertFileContains(okhttp.get("ReportApi.java").toPath(),
+                "final String localVarAccept = \"text/csv, application/json;q=0.5\";",
+                "final String localVarAccept = \"application/pdf, application/json;q=0.5\";",
+                "final String localVarAccept = \"application/json\";");
+        // not split: selected from produces, as before
+        assertFileContains(okhttp.get("ReportApi.java").toPath(), "final String localVarAccept = localVarApiClient.selectHeaderAccept(localVarAccepts);");
+
+        Map<String, File> feign = generateFromContract(spec, "feign", new HashMap<>(), split);
+        assertFileContains(feign.get("ReportApi.java").toPath(),
+                "\"Accept: text/csv, application/json;q=0.5\",",
+                "\"Accept: application/json,application/pdf\",");
+    }
+
     private static Map<String, File> generateFromContract(final String pathToSpecification, final String library) {
         return generateFromContract(pathToSpecification, library, new HashMap<>());
     }

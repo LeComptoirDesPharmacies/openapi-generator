@@ -211,7 +211,12 @@ public class {{classname}} {
             "{{{mediaType}}}"{{^-last}},{{/-last}}
             {{/produces}}
         };
+        {{#vendorExtensions.x-content-type-variant-accept}}
+        final String localVarAccept = "{{{vendorExtensions.x-content-type-variant-accept}}}";
+        {{/vendorExtensions.x-content-type-variant-accept}}
+        {{^vendorExtensions.x-content-type-variant-accept}}
         final String localVarAccept = localVarApiClient.selectHeaderAccept(localVarAccepts);
+        {{/vendorExtensions.x-content-type-variant-accept}}
         if (localVarAccept != null) {
             localVarHeaderParams.put("Accept", localVarAccept);
         }

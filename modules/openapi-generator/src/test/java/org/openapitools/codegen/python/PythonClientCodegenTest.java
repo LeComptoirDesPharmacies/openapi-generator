@@ -25,6 +25,7 @@ import io.swagger.v3.oas.models.media.*;
 import io.swagger.v3.parser.core.models.ParseOptions;
 import io.swagger.v3.parser.util.SchemaTypeUtil;
 import org.openapitools.codegen.*;
+import org.openapitools.codegen.CodegenConstants;
 import org.openapitools.codegen.config.CodegenConfigurator;
 import org.openapitools.codegen.config.GlobalSettings;
 import org.openapitools.codegen.languages.PythonClientCodegen;
@@ -1532,5 +1533,30 @@ public class PythonClientCodegenTest {
                 "_owned_api_client",
                 "def close(self) -> None:");
         TestUtils.assertFileNotContains(rest, "def close(self) -> None:");
+    }
+
+    @Test
+    public void splitOperationsByContentTypeVariantsSendAWeightedAccept() throws IOException {
+        // a variant asks for its own media-type first and still accepts, at a lower weight, what the error
+        // responses declare - not what select_header_accept would pick from that list, the errors' json
+        GlobalSettings.setProperty(CodegenConstants.SPLIT_OPERATIONS_BY_CONTENT_TYPE, "true");
+        try {
+            File output = Files.createTempDirectory("test").toFile();
+            output.deleteOnExit();
+            final CodegenConfigurator configurator = new CodegenConfigurator()
+                    .setGeneratorName("python")
+                    .setInputSpec("src/test/resources/3_0/issue6708-split-by-content-type-error-responses.yaml")
+                    .setOutputDir(output.getAbsolutePath());
+            new DefaultGenerator().opts(configurator.toClientOptInput()).generate().forEach(File::deleteOnExit);
+
+            Path api = Paths.get(output.getAbsolutePath(), "openapi_client/api/report_api.py");
+            TestUtils.assertFileContains(api,
+                    "_header_params['Accept'] = 'text/csv, application/json;q=0.5'",
+                    "_header_params['Accept'] = 'application/pdf, application/json;q=0.5'");
+            // not split: selected from produces, as before
+            TestUtils.assertFileContains(api, "_header_params['Accept'] = self.api_client.select_header_accept(");
+        } finally {
+            GlobalSettings.reset();
+        }
     }
 }

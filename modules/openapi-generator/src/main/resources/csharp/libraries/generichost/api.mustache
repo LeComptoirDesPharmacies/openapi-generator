@@ -698,7 +698,14 @@ namespace {{packageName}}.{{apiPackage}}
                     {{#produces}}
                     {{#-first}}
 
+                    {{#vendorExtensions.x-content-type-variant-accepts}}
+                    {{#-first}}
+                    IEnumerable<MediaTypeWithQualityHeaderValue> acceptHeaderValuesLocalVar = new[] { {{#vendorExtensions.x-content-type-variant-accepts}}MediaTypeWithQualityHeaderValue.Parse("{{{.}}}"){{^-last}}, {{/-last}}{{/vendorExtensions.x-content-type-variant-accepts}} };
+                    {{/-first}}
+                    {{/vendorExtensions.x-content-type-variant-accepts}}
+                    {{^vendorExtensions.x-content-type-variant-accepts}}
                     IEnumerable<MediaTypeWithQualityHeaderValue> acceptHeaderValuesLocalVar = ClientUtils.SelectHeaderAcceptArray(acceptLocalVars);
+                    {{/vendorExtensions.x-content-type-variant-accepts}}
 
                     foreach (var acceptLocalVar in acceptHeaderValuesLocalVar)
                         httpRequestMessageLocalVar.Headers.Accept.Add(acceptLocalVar);

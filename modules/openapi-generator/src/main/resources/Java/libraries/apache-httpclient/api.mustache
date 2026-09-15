@@ -165,7 +165,12 @@ public class {{classname}} extends BaseApi {
     final String[] localVarAccepts = {
       {{#produces}}"{{{mediaType}}}"{{^-last}}, {{/-last}}{{/produces}}
     };
+    {{#vendorExtensions.x-content-type-variant-accept}}
+    final String localVarAccept = "{{{vendorExtensions.x-content-type-variant-accept}}}";
+    {{/vendorExtensions.x-content-type-variant-accept}}
+    {{^vendorExtensions.x-content-type-variant-accept}}
     final String localVarAccept = apiClient.selectHeaderAccept(localVarAccepts);
+    {{/vendorExtensions.x-content-type-variant-accept}}
 
     final String[] localVarContentTypes = {
       {{#consumes}}"{{{mediaType}}}"{{^-last}}, {{/-last}}{{/consumes}}
@@ -213,7 +218,12 @@ public class {{classname}} extends BaseApi {
     final String[] localVarAccepts = {
       {{#produces}}"{{{mediaType}}}"{{^-last}}, {{/-last}}{{/produces}}
     };
+    {{#vendorExtensions.x-content-type-variant-accept}}
+    final String localVarAccept = "{{{vendorExtensions.x-content-type-variant-accept}}}";
+    {{/vendorExtensions.x-content-type-variant-accept}}
+    {{^vendorExtensions.x-content-type-variant-accept}}
     final String localVarAccept = apiClient.selectHeaderAccept(localVarAccepts);
+    {{/vendorExtensions.x-content-type-variant-accept}}
 
     final String[] localVarContentTypes = {
       {{#consumes}}"{{{mediaType}}}"{{^-last}}, {{/-last}}{{/consumes}}

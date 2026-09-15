@@ -146,7 +146,12 @@ public class {{classname}} extends BaseApi {
         final String[] localVarAccepts = { {{#hasProduces}}
             {{#produces}}"{{{mediaType}}}"{{^-last}}, {{/-last}}{{/produces}}
         {{/hasProduces}} };
+        {{#vendorExtensions.x-content-type-variant-accept}}
+        final List<MediaType> localVarAccept = MediaType.parseMediaTypes("{{{vendorExtensions.x-content-type-variant-accept}}}");
+        {{/vendorExtensions.x-content-type-variant-accept}}
+        {{^vendorExtensions.x-content-type-variant-accept}}
         final List<MediaType> localVarAccept = apiClient.selectHeaderAccept(localVarAccepts);
+        {{/vendorExtensions.x-content-type-variant-accept}}
         final String[] localVarContentTypes = { {{#hasConsumes}}
             {{#consumes}}"{{{mediaType}}}"{{^-last}}, {{/-last}}{{/consumes}}
         {{/hasConsumes}} };
@@ -173,7 +178,12 @@ public class {{classname}} extends BaseApi {
         final String[] localVarAccepts = { {{#hasProduces}}
             {{#produces}}"{{{mediaType}}}"{{^-last}}, {{/-last}}{{/produces}}
         {{/hasProduces}} };
+        {{#vendorExtensions.x-content-type-variant-accept}}
+        final List<MediaType> localVarAccept = MediaType.parseMediaTypes("{{{vendorExtensions.x-content-type-variant-accept}}}");
+        {{/vendorExtensions.x-content-type-variant-accept}}
+        {{^vendorExtensions.x-content-type-variant-accept}}
         final List<MediaType> localVarAccept = apiClient.selectHeaderAccept(localVarAccepts);
+        {{/vendorExtensions.x-content-type-variant-accept}}
         final String[] localVarContentTypes = { {{#hasConsumes}}
             {{#consumes}}"{{{mediaType}}}"{{^-last}}, {{/-last}}{{/consumes}}
         {{/hasConsumes}} };

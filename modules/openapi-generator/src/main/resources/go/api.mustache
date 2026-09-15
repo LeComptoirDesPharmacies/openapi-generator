@@ -241,6 +241,11 @@ func (a *{{{classname}}}Service) {{nickname}}Execute(r {{#structPrefix}}{{&class
 		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
 	}
 
+	{{#vendorExtensions.x-content-type-variant-accept}}
+	// set Accept header: this variant's media type first, its error responses' after
+	localVarHTTPHeaderAccept := "{{{vendorExtensions.x-content-type-variant-accept}}}"
+	{{/vendorExtensions.x-content-type-variant-accept}}
+	{{^vendorExtensions.x-content-type-variant-accept}}
 	// to determine the Accept header
 {{=<% %>=}}
 	localVarHTTPHeaderAccepts := []string{<%#produces%>"<%&mediaType%>"<%^-last%>, <%/-last%><%/produces%>}
@@ -248,6 +253,7 @@ func (a *{{{classname}}}Service) {{nickname}}Execute(r {{#structPrefix}}{{&class
 
 	// set Accept header
 	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	{{/vendorExtensions.x-content-type-variant-accept}}
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}

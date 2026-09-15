@@ -718,7 +718,7 @@ public class {{classname}} {
     {{#bodyParam}}
     localVarRequestBuilder.header("Content-Type", "{{#hasConsumes}}{{#consumes}}{{#-first}}{{{mediaType}}}{{/-first}}{{/consumes}}{{/hasConsumes}}{{#hasConsumes}}{{^consumes}}application/json{{/consumes}}{{/hasConsumes}}{{^hasConsumes}}application/json{{/hasConsumes}}");
     {{/bodyParam}}
-    localVarRequestBuilder.header("Accept", "{{#hasProduces}}{{#produces}}{{{mediaType}}}{{^-last}}, {{/-last}}{{/produces}}{{/hasProduces}}{{#hasProduces}}{{^produces}}application/json{{/produces}}{{/hasProduces}}{{^hasProduces}}application/json{{/hasProduces}}");
+    localVarRequestBuilder.header("Accept", "{{#vendorExtensions.x-content-type-variant-accept}}{{{.}}}{{/vendorExtensions.x-content-type-variant-accept}}{{^vendorExtensions.x-content-type-variant-accept}}{{#hasProduces}}{{#produces}}{{{mediaType}}}{{^-last}}, {{/-last}}{{/produces}}{{/hasProduces}}{{#hasProduces}}{{^produces}}application/json{{/produces}}{{/hasProduces}}{{^hasProduces}}application/json{{/hasProduces}}{{/vendorExtensions.x-content-type-variant-accept}}");
     {{#useGzipFeature}}
     localVarRequestBuilder.header("Accept-Encoding", "gzip");
     {{/useGzipFeature}}

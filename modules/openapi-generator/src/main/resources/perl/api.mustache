@@ -85,7 +85,7 @@ sub {{operationId}} {
     my $form_params = {};
 
     # 'Accept' and 'Content-Type' header
-    my $_header_accept = $self->{api_client}->select_header_accept({{#produces}}'{{{mediaType}}}'{{^-last}}, {{/-last}}{{/produces}});
+    my $_header_accept = {{#vendorExtensions.x-content-type-variant-accept}}'{{{.}}}'{{/vendorExtensions.x-content-type-variant-accept}}{{^vendorExtensions.x-content-type-variant-accept}}$self->{api_client}->select_header_accept({{#produces}}'{{{mediaType}}}'{{^-last}}, {{/-last}}{{/produces}}){{/vendorExtensions.x-content-type-variant-accept}};
     if ($_header_accept) {
         $header_params->{'Accept'} = $_header_accept;
     }

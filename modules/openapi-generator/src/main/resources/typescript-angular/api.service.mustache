@@ -191,11 +191,16 @@ export class {{classname}} extends BaseService {
 {{/isOpenId}}
 
 {{/authMethods}}
+        {{#vendorExtensions.x-content-type-variant-accept}}
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? '{{{vendorExtensions.x-content-type-variant-accept}}}';
+        {{/vendorExtensions.x-content-type-variant-accept}}
+        {{^vendorExtensions.x-content-type-variant-accept}}
         const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
     {{#produces}}
             '{{{mediaType}}}'{{^-last}},{{/-last}}
     {{/produces}}
         ]);
+        {{/vendorExtensions.x-content-type-variant-accept}}
         if (localVarHttpHeaderAcceptSelected !== undefined) {
             localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
         }

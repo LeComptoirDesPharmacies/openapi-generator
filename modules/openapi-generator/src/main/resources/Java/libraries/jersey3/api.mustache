@@ -190,7 +190,12 @@ public class {{classname}} {
 
     {{/-last}}
     {{/formParams}}
+    {{#vendorExtensions.x-content-type-variant-accept}}
+    String localVarAccept = "{{{vendorExtensions.x-content-type-variant-accept}}}";
+    {{/vendorExtensions.x-content-type-variant-accept}}
+    {{^vendorExtensions.x-content-type-variant-accept}}
     String localVarAccept = apiClient.selectHeaderAccept({{#produces}}"{{{mediaType}}}"{{^-last}}, {{/-last}}{{/produces}});
+    {{/vendorExtensions.x-content-type-variant-accept}}
     String localVarContentType = apiClient.selectHeaderContentType({{#consumes}}"{{{mediaType}}}"{{^-last}}, {{/-last}}{{/consumes}});
     {{#hasAuthMethods}}
     String[] localVarAuthNames = {{=% %=}}new String[] {%#authMethods%"%name%"%^-last%, %/-last%%/authMethods%};%={{ }}=%

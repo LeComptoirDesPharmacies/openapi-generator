@@ -296,7 +296,12 @@ namespace {{packageName}}.{{apiPackage}}
                 localVarRequestOptions.HeaderParameters.Add("Content-Type", localVarContentType);
             }
 
+            {{#vendorExtensions.x-content-type-variant-accept}}
+            var localVarAccept = "{{{vendorExtensions.x-content-type-variant-accept}}}";
+            {{/vendorExtensions.x-content-type-variant-accept}}
+            {{^vendorExtensions.x-content-type-variant-accept}}
             var localVarAccept = {{packageName}}.Client.ClientUtils.SelectHeaderAccept(_accepts);
+            {{/vendorExtensions.x-content-type-variant-accept}}
             if (localVarAccept != null)
             {
                 localVarRequestOptions.HeaderParameters.Add("Accept", localVarAccept);
@@ -568,7 +573,12 @@ namespace {{packageName}}.{{apiPackage}}
                 localVarRequestOptions.HeaderParameters.Add("Content-Type", localVarContentType);
             }
 
+            {{#vendorExtensions.x-content-type-variant-accept}}
+            var localVarAccept = "{{{vendorExtensions.x-content-type-variant-accept}}}";
+            {{/vendorExtensions.x-content-type-variant-accept}}
+            {{^vendorExtensions.x-content-type-variant-accept}}
             var localVarAccept = {{packageName}}.Client.ClientUtils.SelectHeaderAccept(_accepts);
+            {{/vendorExtensions.x-content-type-variant-accept}}
             if (localVarAccept != null)
             {
                 localVarRequestOptions.HeaderParameters.Add("Accept", localVarAccept);

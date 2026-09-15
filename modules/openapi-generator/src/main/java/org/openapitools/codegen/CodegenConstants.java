@@ -167,6 +167,14 @@ public class CodegenConstants {
     public static final String X_CONTENT_TYPE_VARIANT_RESPONSE = "x-content-type-variant-response";
     public static final String X_CONTENT_TYPE_VARIANT_REQUEST_INDEX = "x-content-type-variant-request-index";
     public static final String X_CONTENT_TYPE_VARIANT_RESPONSE_INDEX = "x-content-type-variant-response-index";
+    /**
+     * On a variant narrowed on its response, the Accept a client sends for it: the media-type it was narrowed
+     * to at full weight, then those its other responses - errors, typically - declare at {@code q=0.5},
+     * e.g. {@code text/csv, application/json;q=0.5}.
+     */
+    public static final String X_CONTENT_TYPE_VARIANT_ACCEPT = "x-content-type-variant-accept";
+    /** The same Accept as {@link #X_CONTENT_TYPE_VARIANT_ACCEPT}, one media-type per entry, for templates that fill an array. */
+    public static final String X_CONTENT_TYPE_VARIANT_ACCEPTS = "x-content-type-variant-accepts";
 
     public static final String USE_DATETIME_OFFSET = "useDateTimeOffset";
     public static final String USE_DATETIME_OFFSET_DESC = "Use DateTimeOffset to model date-time properties";

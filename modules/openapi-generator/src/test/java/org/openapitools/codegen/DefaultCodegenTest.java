@@ -5452,26 +5452,33 @@ public class DefaultCodegenTest {
         // the error responses are left as they are: they still type their json body
         assertThat(ops).allSatisfy(op -> assertThat(op.responses).filteredOn(r -> "400".equals(r.code))
                 .extracting(r -> r.getContent().keySet()).containsExactly(Set.of("application/json")));
+        // what a client asks for: its own media-type first, the error responses' at a lower weight
+        assertThat(ops).extracting(op -> op.operationId, op -> op.vendorExtensions.get(CodegenConstants.X_CONTENT_TYPE_VARIANT_ACCEPT))
+                .containsExactlyInAnyOrder(
+                        tuple("getReportAsJson", "application/json"),
+                        tuple("getReportAsCsv", "text/csv, application/json;q=0.5"));
 
         // POST /reports: split on both axes. consumes follows the narrowed request body, produces the
         // narrowed success response, whatever the json 400 declares.
         Operation post = openAPI.getPaths().get("/reports").getPost();
         assertThat(codegen.divideOperationsByContentType(openAPI, "/reports", "post", post))
                 .extracting(v -> codegen.fromOperation("/reports", "post", v, null))
-                .extracting(op -> op.operationId, op -> mediaTypes(op.consumes), op -> mediaTypes(op.produces))
+                .extracting(op -> op.operationId, op -> mediaTypes(op.consumes), op -> mediaTypes(op.produces),
+                        op -> op.vendorExtensions.get(CodegenConstants.X_CONTENT_TYPE_VARIANT_ACCEPT))
                 .containsExactlyInAnyOrder(
-                        tuple("createReportWithJsonAsJson", List.of("application/json"), List.of("application/json")),
-                        tuple("createReportWithJsonAsPdf", List.of("application/json"), List.of("application/pdf")),
-                        tuple("createReportWithXmlAsJson", List.of("application/xml"), List.of("application/json")),
-                        tuple("createReportWithXmlAsPdf", List.of("application/xml"), List.of("application/pdf")));
+                        tuple("createReportWithJsonAsJson", List.of("application/json"), List.of("application/json"), "application/json"),
+                        tuple("createReportWithJsonAsPdf", List.of("application/json"), List.of("application/pdf"), "application/pdf, application/json;q=0.5"),
+                        tuple("createReportWithXmlAsJson", List.of("application/xml"), List.of("application/json"), "application/json"),
+                        tuple("createReportWithXmlAsPdf", List.of("application/xml"), List.of("application/pdf"), "application/pdf, application/json;q=0.5"));
 
-        // an operation the split leaves alone keeps the union of every response, as it always has - and a
-        // spec-authored axis extension, with no variant group, does not make it a variant
+        // an operation the split leaves alone keeps the union of every response, as it always has, and no
+        // variant Accept - and a spec-authored axis extension, with no variant group, does not make it a variant
         Operation voucher = openAPI.getPaths().get("/reports/{id}/voucher").getGet();
         voucher.addExtension(CodegenConstants.X_CONTENT_TYPE_VARIANT_RESPONSE, "text/csv");
         assertThat(DefaultCodegen.getProducesInfo(openAPI, voucher)).containsExactlyInAnyOrder("application/pdf", "application/json");
-        assertThat(mediaTypes(codegen.fromOperation("/reports/{id}/voucher", "get", voucher, null).produces))
-                .containsExactlyInAnyOrder("application/pdf", "application/json");
+        CodegenOperation untouched = codegen.fromOperation("/reports/{id}/voucher", "get", voucher, null);
+        assertThat(mediaTypes(untouched.produces)).containsExactlyInAnyOrder("application/pdf", "application/json");
+        assertThat(untouched.vendorExtensions).doesNotContainKey(CodegenConstants.X_CONTENT_TYPE_VARIANT_ACCEPT);
     }
 
     private static List<String> mediaTypes(List<Map<String, String>> media) {

@@ -2631,10 +2631,9 @@ public class SpringCodegenTest {
 
     @Test
     public void splitOperationsByContentTypeVariantsSendTheirOwnAccept() throws IOException {
-        // spring-cloud renders produces from x-accepts (singleContentTypes) and SpringMvcContract sends
-        // produces[0] as Accept: a variant must carry the media-type it was narrowed to, not the json of the
-        // error responses the operation also declares, or it would ask the server for another media-type
-        // than the one it is typed on
+        // SpringMvcContract sends produces[0] alone as Accept, so a variant's weighted Accept - its own
+        // media-type first, the json of the error responses after - goes through the headers attribute,
+        // which it sends verbatim; produces, which would send its first entry on top, is left out
         GlobalSettings.setProperty(CodegenConstants.SPLIT_OPERATIONS_BY_CONTENT_TYPE, "true");
         try {
             Map<String, Object> additionalProperties = new HashMap<>();
@@ -2645,13 +2644,23 @@ public class SpringCodegenTest {
             JavaFileAssert.assertThat(files.get("ReportsApi.java"))
                     .assertMethod("getReportAsCsv")
                     .assertMethodAnnotations()
-                    .containsWithNameAndAttributes("RequestMapping", ImmutableMap.of("produces", "{ \"text/csv\" }"))
+                    .containsWithNameAndAttributes("RequestMapping", ImmutableMap.of("headers", "{ \"Accept=text/csv, application/json;q=0.5\" }"))
+                    .toMethod().toFileAssert()
+                    .assertMethod("getReportAsJson")
+                    .assertMethodAnnotations()
+                    .containsWithNameAndAttributes("RequestMapping", ImmutableMap.of("headers", "{ \"Accept=application/json\" }"))
                     .toMethod().toFileAssert()
                     .assertMethod("createReportWithXmlAsPdf")
                     .assertMethodAnnotations()
                     .containsWithNameAndAttributes("RequestMapping", ImmutableMap.of(
                             "consumes", "\"application/xml\"",
-                            "produces", "{ \"application/pdf\" }"));
+                            "headers", "{ \"Accept=application/pdf, application/json;q=0.5\" }"))
+                    .toMethod().toFileAssert()
+                    // not split: produces as before, and no Accept header
+                    .assertMethod("getReportVoucher")
+                    .assertMethodAnnotations()
+                    .containsWithNameAndAttributes("RequestMapping", ImmutableMap.of("produces", "{ \"application/json\", \"application/pdf\" }"));
+            TestUtils.assertFileNotContains(files.get("ReportsApi.java").toPath(), "produces = { \"text/csv\" }");
         } finally {
             GlobalSettings.reset();
         }

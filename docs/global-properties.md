@@ -37,11 +37,15 @@ The content-type declared first on each axis is the default one, consistently wi
 generator. The option is opt-in and off by default, because it changes the shape of the generated API.
 
 Each variant speaks only the media-type it was narrowed to: its `consumes` and `produces` are that single
-media-type, and so are the `Content-Type` and `Accept` of the generators that derive them from those lists
-(most do; `kotlin-client`, for one, still filters `produces` down to the types it can deserialise). The other
-responses of the operation, error ones typically, are left as they are and keep typing their own body — a
-server that negotiates strictly on `Accept` may then refuse to send a JSON error body to a variant that only
-accepts, say, PDF.
+media-type, which is what a server generator maps the variant on. The other responses of the operation, error
+ones typically, are left as they are and keep typing their own body. A client generator sends for a variant
+an `Accept` that asks for its media-type first and still accepts, at `q=0.5`, what those other responses
+declare — `text/csv, application/json;q=0.5` — so a server negotiating on `Accept` serves the former on
+success and the latter on failure. The templates read it from the `x-content-type-variant-accept` (joined)
+and `x-content-type-variant-accepts` (one entry each) extensions; the Java, Spring Cloud (through the
+`headers` attribute, since Feign's `SpringMvcContract` sends `produces[0]` alone), Spring HTTP interface,
+Python, C#, Go, Ruby, Perl, TypeScript (angular, nestjs), Objective-C, Groovy and Eiffel clients do. A client
+whose template still derives the header from `produces` sends the variant's media-type alone.
 
 Each generated operation carries `x-content-type-variant-*` extensions recording the group it was split
 from, the content-type it was narrowed to on each axis and the rank of that content-type in its axis. A

@@ -398,11 +398,16 @@ https://github.com/OpenAPITools/openapi-generator/blob/c84b949df1a9ec04ba75989cb
         {{#hasProduces}}
         # set the HTTP header `Accept`
         if 'Accept' not in _header_params:
+            {{#vendorExtensions.x-content-type-variant-accept}}
+            _header_params['Accept'] = '{{{vendorExtensions.x-content-type-variant-accept}}}'
+            {{/vendorExtensions.x-content-type-variant-accept}}
+            {{^vendorExtensions.x-content-type-variant-accept}}
             _header_params['Accept'] = self.api_client.select_header_accept(
                 [{{#produces}}
                     '{{{mediaType}}}'{{^-last}}, {{/-last}}{{/produces}}
                 ]
             )
+            {{/vendorExtensions.x-content-type-variant-accept}}
         {{/hasProduces}}
 
         {{#hasConsumes}}
